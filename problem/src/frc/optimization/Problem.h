@@ -4,16 +4,15 @@
 
 #pragma once
 
+#include <optional>
 #include <utility>
 
-#include <autodiff/reverse/var.hpp>
-#include <autodiff/reverse/var/eigen.hpp>
 #include <wpi/SymbolExports.h>
 
 #include "Eigen/Core"
-#include "frc/optimization/AutodiffWrapper.h"
-#include "frc/optimization/EqualityConstraint.h"
-#include "frc/optimization/InequalityConstraint.h"
+#include "frc/autodiff/Variable.h"
+#include "frc/optimization/Constraints.h"
+#include "frc/optimization/VariableMatrix.h"
 
 namespace frc {
 
@@ -62,10 +61,10 @@ namespace frc {
  * frc::Problem problem;
  *
  * // 2x1 state vector with N + 1 timesteps (includes last state)
- * auto X = problem.Var<2, N + 1>();  // 2x1 state vector with N+1 timesteps
+ * auto X = problem.DecisionVariable(2, N + 1);
  *
  * // 1x1 input vector with N timesteps (input at last state doesn't matter)
- * auto U = problem.Var<1, N>();
+ * auto U = problem.DecisionVariable(1, N);
  * @endcode
  * By convention, we use capital letters for the variables to designate
  * matrices.
@@ -80,7 +79,7 @@ namespace frc {
  *   auto a_k = U(0, k);
  *
  *   // pₖ₊₁ = 1/2aₖt² + vₖt
- *   problem.SubjectTo(p_k1 == 0.5 * pow(t, 2) * a_k + t * v_k);  // NOLINT
+ *   problem.SubjectTo(p_k1 == 0.5 * frc::pow(t, 2) * a_k + t * v_k);
  * }
  * @endcode
  *
@@ -91,20 +90,20 @@ namespace frc {
  * problem.SubjectTo(X.Col(N + 1) == frc::Matrixd<2, 1>{{10.0}, {0.0}});
 
  * // Limit velocity
- * problem.SubjectTo(X.Row(1) >= -1);
+ * problem.SubjectTo(-1 <= X.Row(1));
  * problem.SubjectTo(X.Row(1) <= 1);
 
  * // Limit acceleration
- * problem.SubjectTo(U >= -1);
+ * problem.SubjectTo(-1 <= U);
  * problem.SubjectTo(U <= 1);
  * @endcode
  *
  * Next, we'll create a cost function for minimizing position error.
  * @code{.cpp}
  * // Cost function - minimize position error
- * frc::Variable<1, 1> J = 0.0;
+ * frc::VariableMatrix J = 0.0;
  * for (int k = 0; k < N + 1; ++k) {
- *   J += std::pow(10.0 - X(0, k), 2);
+ *   J += frc::pow(10.0 - X(0, k), 2);
  * }
  * problem.Minimize(J);
  * @endcode
@@ -119,7 +118,7 @@ namespace frc {
  * function while obeying the constraints. You can obtain the solution by
  * querying the values of the variables like so.
  * @code{.cpp}
- * double input = U.Value(0, 0);
+ * double input = U.Value();
  * @endcode
  *
  * In retrospect, the solution here seems obvious: if you want to reach the
@@ -131,26 +130,51 @@ namespace frc {
  */
 class WPILIB_DLLEXPORT Problem {
  public:
-  Problem() = default;
+  static constexpr double kTolerance = 1e-6;
+  static constexpr int kMaxIterations = 1000;
+
+  /**
+   * The type of optimization problem to solve.
+   */
+  enum class ProblemType {
+    /// The optimization problem has a linear cost function and linear
+    /// constraints
+    kLinear,
+    /// The optimization problem has a quadratic cost function and linear
+    /// constraints
+    kQuadratic,
+    /// The optimization problem has a nonlinear cost function or nonlinear
+    /// constraints
+    kNonlinear
+  };
+
+  /**
+   * Solver return status.
+   */
+  enum class SolverStatus {
+    /// The solver found a solution
+    kOk,
+    /// The solver returned a solution that was infeasible
+    kInfeasible,
+    /// The solver returned a solution after exceeding the maximum number of
+    /// iterations
+    kMaxIterations
+  };
+
+  /**
+   * Construct the optimization problem.
+   *
+   * @param problemType The type of optimization problem to solve. Nonlinear is
+   *                    assumed by default, but the user can specify their
+   *                    problem is linear or quadratic to use a faster solver
+   *                    for that type of problem.
+   */
+  explicit Problem(ProblemType problemType = ProblemType::kNonlinear);
 
   /**
    * Create a matrix of decision variables in the optimization problem.
    */
-  template <int Rows = 1, int Cols = 1>
-  Variable<Rows, Cols> Var() {
-    Variable<Rows, Cols> vars;
-
-    int oldSize = m_leaves.rows();
-    m_leaves.resize(oldSize + Rows * Cols);
-    for (int row = 0; row < Rows; ++row) {
-      for (int col = 0; col < Cols; ++col) {
-        vars.GetStorage()(row, col) =
-            AutodiffWrapper{this, oldSize + row * Cols + col};
-      }
-    }
-
-    return vars;
-  }
+  VariableMatrix DecisionVariable(int rows = 1, int cols = 1);
 
   /**
    * Tells the solver to minimize the output of the given cost function.
@@ -161,7 +185,7 @@ class WPILIB_DLLEXPORT Problem {
    *
    * @param cost The cost function to minimize.
    */
-  void Minimize(const Variable<1, 1>& cost);
+  void Minimize(const autodiff::Variable& cost);
 
   /**
    * Tells the solver to minimize the output of the given cost function.
@@ -172,7 +196,29 @@ class WPILIB_DLLEXPORT Problem {
    *
    * @param cost The cost function to minimize.
    */
-  void Minimize(Variable<1, 1>&& cost);
+  void Minimize(autodiff::Variable&& cost);
+
+  /**
+   * Tells the solver to minimize the output of the given cost function.
+   *
+   * Note that this is optional. If only constraints are specified, the solver
+   * will find the closest solution to the initial conditions that's in the
+   * feasible set.
+   *
+   * @param cost The cost function to minimize. It must return a 1x1 matrix.
+   */
+  void Minimize(const VariableMatrix& cost);
+
+  /**
+   * Tells the solver to minimize the output of the given cost function.
+   *
+   * Note that this is optional. If only constraints are specified, the solver
+   * will find the closest solution to the initial conditions that's in the
+   * feasible set.
+   *
+   * @param cost The cost function to minimize. It must return a 1x1 matrix.
+   */
+  void Minimize(VariableMatrix&& cost);
 
   /**
    * Tells the solver to solve the problem while obeying the given equality
@@ -180,19 +226,7 @@ class WPILIB_DLLEXPORT Problem {
    *
    * @param constraint The constraint to satisfy.
    */
-  template <int Rows, int Cols, int... Args>
-  void SubjectTo(
-      Eigen::Matrix<EqualityConstraint, Rows, Cols, Args...>&& constraint) {
-    int oldSize = m_equalityConstraints.rows();
-    m_equalityConstraints.resize(oldSize + Rows * Cols);
-
-    for (int row = 0; row < Rows; ++row) {
-      for (int col = 0; col < Cols; ++col) {
-        m_equalityConstraints(oldSize + row * Cols + col) =
-            std::move(constraint(row, col).variable.GetAutodiff());
-      }
-    }
-  }
+  void SubjectTo(EqualityConstraints&& constraint);
 
   /**
    * Tells the solver to solve the problem while obeying the given inequality
@@ -200,45 +234,79 @@ class WPILIB_DLLEXPORT Problem {
    *
    * @param constraint The constraint to satisfy.
    */
-  template <int Rows, int Cols, int... Args>
-  void SubjectTo(
-      Eigen::Matrix<InequalityConstraint, Rows, Cols, Args...>&& constraint) {
-    int oldSize = m_inequalityConstraints.rows();
-    m_inequalityConstraints.resize(oldSize + Rows * Cols);
-
-    for (int row = 0; row < Rows; ++row) {
-      for (int col = 0; col < Cols; ++col) {
-        m_inequalityConstraints(oldSize + row * Cols + col) =
-            std::move(constraint(row, col).variable.GetAutodiff());
-      }
-    }
-  }
+  void SubjectTo(InequalityConstraints&& constraint);
 
   /**
    * Solve the optimization problem. The solution will be stored in the original
    * variables used to construct the problem.
+   *
+   * @param tolerance The solver will stop once the norm of the gradient is
+   *                  below this tolerance.
+   * @param maxIterations The maximum number of solver iterations before
+   *                      returning a solution.
    */
-  void Solve();
+  SolverStatus Solve(double tolerance = kTolerance,
+                     int maxIterations = kMaxIterations);
 
  private:
   // Leaves of the problem's expression tree
   autodiff::VectorXvar m_leaves;
 
   // Cost function: f(x)
-  autodiff::var m_f;
+  std::optional<autodiff::Variable> m_f;
 
-  // Inequality constraints: b(x) ≥ 0
-  autodiff::VectorXvar m_inequalityConstraints;
-
-  // Equality constraints: c(x) = 0
+  // Equality constraints: cₑ(x) = 0
   autodiff::VectorXvar m_equalityConstraints;
 
+  // Inequality constraints: cᵢ(x) ≥ 0
+  autodiff::VectorXvar m_inequalityConstraints;
+
+  // Problem type
+  ProblemType m_problemType;
+
+  // Convergence tolerance
+  double m_tolerance = kTolerance;
+
+  // Maximum number of solver iterations
+  int m_maxIterations = kMaxIterations;
+
   /**
-   * Initialize leaves with the given vector.
+   * Grows an autodiff vector without breaking links to old autodiff variables.
    *
-   * @param x The input vector.
+   * @param v Vector to grow.
+   * @param growth Amount by which to grow the vector.
    */
-  void SetLeaves(const Eigen::Ref<const Eigen::VectorXd>& x);
+  static void GrowAutodiffVector(autodiff::VectorXvar& v, int growth);
+
+  /**
+   * Assigns the contents of a double vector to an autodiff vector.
+   *
+   * @param dest The autodiff vector.
+   * @param src The double vector.
+   */
+  static void SetAD(Eigen::Ref<autodiff::VectorXvar> dest,
+                    const Eigen::Ref<const Eigen::VectorXd>& src);
+
+  /**
+   * Regularize a matrix (make all its eigenvalues positive) using a modified
+   * Cholesky decomposition.
+   *
+   * @param A The matrix to regularize.
+   */
+  void Regularize(Eigen::SparseMatrix<double>& A);
+
+  /**
+   * Applies fraction-to-the-boundary rule to a variable and its iterate, then
+   * returns a fraction of the iterate step size within (0, 1].
+   *
+   * @param x The variable.
+   * @param p The iterate on the variable.
+   * @param tau Fraction-to-the-boundary rule scaling factor.
+   * @return Fraction of the iterate step size within (0, 1].
+   */
+  static double FractionToTheBoundaryRule(
+      const Eigen::Ref<const Eigen::VectorXd>& x,
+      const Eigen::Ref<const Eigen::VectorXd>& p, double tau);
 
   /**
    * The cost function f(x).
@@ -248,56 +316,26 @@ class WPILIB_DLLEXPORT Problem {
   double f(const Eigen::Ref<const Eigen::VectorXd>& x);
 
   /**
-   * Return the optimal step size alpha using backtracking line search.
-   *
-   * @param x The initial guess.
-   * @param gradient The gradient at x.
-   */
-  double BacktrackingLineSearch(
-      const Eigen::Ref<const Eigen::VectorXd>& x,
-      const Eigen::Ref<const Eigen::VectorXd>& gradient);
+  Find the optimal solution to the nonlinear program using an interior-point
+  solver.
 
-  /**
-   * Find the optimal solution using gradient descent.
-   *
-   * @param x The initial guess.
-   */
-  Eigen::VectorXd GradientDescent(const Eigen::Ref<const Eigen::VectorXd>& x);
-
-  /**
-  Find the optimal solution using a sequential quadratic programming solver.
-
-  A sequential quadratic programming (SQP) problem has the form:
+  A nonlinear program has the form:
 
   @verbatim
        min_x f(x)
+  subject to cₑ(x) = 0
+             cᵢ(x) ≥ 0
   @endverbatim
 
-  where f(x) is the cost function.
+  where f(x) is the cost function, cₑ(x) are the equality constraints, and cᵢ(x)
+  are the inequality constraints.
 
-  @param x The initial guess.
+  @param[in] initialGuess The initial guess.
+  @param[out] status The solver status.
   */
-  Eigen::VectorXd UnconstrainedSQP(const Eigen::Ref<const Eigen::VectorXd>& x);
-
-  /**
-  Find the optimal solution using a sequential quadratic programming solver.
-
-  A sequential quadratic programming (SQP) problem has the form:
-
-  @verbatim
-       min_x f(x)
-  subject to b(x) ≥ 0
-             c(x) = 0
-  @endverbatim
-
-  where f(x) is the cost function, b(x) are the inequality constraints, and c(x)
-  are the equality constraints.
-
-  @param x The initial guess.
-  */
-  Eigen::VectorXd SQP(const Eigen::Ref<const Eigen::VectorXd>& x);
-
-  friend class AutodiffWrapper;
+  Eigen::VectorXd InteriorPoint(
+      const Eigen::Ref<const Eigen::VectorXd>& initialGuess,
+      SolverStatus* status);
 };
 
 }  // namespace frc

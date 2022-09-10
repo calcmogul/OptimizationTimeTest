@@ -14,7 +14,7 @@
 int main() {
   auto start = std::chrono::system_clock::now();
 
-  constexpr auto T = 5_s;
+  constexpr auto T = 1_s;
   constexpr auto dt = 5_ms;
   constexpr int N = T / dt;
 
@@ -28,8 +28,8 @@ int main() {
   frc::DiscretizeAB<1, 1>(system.A(), system.B(), dt, &A, &B);
 
   frc::Problem problem;
-  auto X = problem.Var<1, N + 1>();
-  auto U = problem.Var<1, N>();
+  auto X = problem.DecisionVariable(1, N + 1);
+  auto U = problem.DecisionVariable(1, N);
 
   // Dynamics constraint
   for (int k = 0; k < N; ++k) {
@@ -38,11 +38,11 @@ int main() {
 
   // State and input constraints
   problem.SubjectTo(X.Col(0) == 0.0);
-  // problem.SubjectTo(-12 <= U);
-  // problem.SubjectTo(U <= 12);
+  problem.SubjectTo(-12 <= U);
+  problem.SubjectTo(U <= 12);
 
   // Cost function - minimize error
-  frc::Variable<1, 1> J = 0.0;
+  frc::VariableMatrix J = 0.0;
   for (int k = 0; k < N + 1; ++k) {
     J += ((10.0 - X.Col(k)).Transpose() * (10.0 - X.Col(k)));
   }

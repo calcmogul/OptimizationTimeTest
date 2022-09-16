@@ -49,14 +49,12 @@ int main() {
   problem.Minimize(J);
 
   auto end1 = std::chrono::system_clock::now();
-
-  problem.Solve();
-  auto end2 = std::chrono::system_clock::now();
-
   using std::chrono::duration_cast;
   using std::chrono::microseconds;
-  fmt::print("Setup time={} ms\n",
-      duration_cast<microseconds>(end1 - start).count() / 1000.0);
-  fmt::print("Solve time={} ms\n",
-      duration_cast<microseconds>(end2 - end1).count() / 1000.0);
+  fmt::print("Setup time: {} ms\n",
+             duration_cast<microseconds>(end1 - start).count() / 1000.0);
+
+  frc::SolverConfig config;
+  config.diagnostics = true;
+  problem.Solve(config);
 }

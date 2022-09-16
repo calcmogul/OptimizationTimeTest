@@ -608,7 +608,17 @@ Eigen::VectorXd Problem::InteriorPoint(
     tau = std::max(tau_min, 1.0 - mu);
   }
 
-  fmt::print("iterations={}\n", iterations);
+  if (m_config.diagnostics) {
+    endTime = std::chrono::system_clock::now();
+    fmt::print("Number of iterations: {}\n", iterations);
+
+    using std::chrono::duration_cast;
+    using std::chrono::microseconds;
+    fmt::print(
+        "Solve time: {} ms\n",
+        duration_cast<microseconds>(endTime - startTime).count() / 1000.0);
+  }
+
   *status = SolverStatus::kOk;
   return x;
 }

@@ -8,18 +8,14 @@
 
 #include "Eigen/Core"
 #include "Eigen/SparseCore"
+#include "frc/autodiff/Expression.h"
+#include "frc/autodiff/IntrusiveSharedPtr.h"
 
 namespace frc::autodiff {
 
-class WPILIB_DLLEXPORT Tape;
-struct WPILIB_DLLEXPORT Expression;
-
 class WPILIB_DLLEXPORT Variable {
- private:
-  struct PrivateInit {};
-
  public:
-  int index = -1;
+  IntrusiveSharedPtr<Expression> expr;
 
   constexpr Variable() = default;
 
@@ -36,9 +32,9 @@ class WPILIB_DLLEXPORT Variable {
   /**
    * Constructs a Variable pointing to the specified entry on a tape.
    *
-   * @param index The index of the autodiff variable on the tape.
+   * @param expr The autodiff variable.
    */
-  explicit Variable(int index, const PrivateInit&);
+  explicit Variable(IntrusiveSharedPtr<Expression> expr);
 
   Variable& operator=(double value);
 
@@ -148,51 +144,9 @@ class WPILIB_DLLEXPORT Variable {
   const Expression& GetExpression() const;
 
   Expression& GetExpression();
-
- private:
-  friend class WPILIB_DLLEXPORT Tape;
 };
 
 using VectorXvar = Eigen::Vector<frc::autodiff::Variable, Eigen::Dynamic>;
-
-/**
- * Create a Variable from a constant that has a derivative of zero.
- */
-WPILIB_DLLEXPORT Variable Constant(double value);
-
-/**
- * Returns gradient of a variable with respect to the given variable.
- *
- * @param variable Variable of which to compute the gradient.
- * @param wrt Variable with respect to which to compute the gradient.
- */
-WPILIB_DLLEXPORT double Gradient(Variable variable, Variable& wrt);
-
-/**
- * Returns gradient of a variable with respect to the given variable.
- *
- * @param variable Variable of which to compute the gradient.
- * @param wrt Variables with respect to which to compute the gradient.
- */
-WPILIB_DLLEXPORT Eigen::VectorXd Gradient(Variable variable, VectorXvar& wrt);
-
-/**
- * Returns the Jacobian of an autodiff vector with respect to the given vector.
- *
- * @param variables Vector of which to compute the Jacobian.
- * @param wrt Vector with respect to which to compute the Jacobian.
- */
-WPILIB_DLLEXPORT Eigen::SparseMatrix<double> Jacobian(VectorXvar& variables,
-                                                      VectorXvar& wrt);
-
-/**
- * Returns the Hessian of an autodiff variable with respect to the given vector.
- *
- * @param variable Variable of which to compute the Hessian.
- * @param wrt Vector with respect to which to compute the Hessian.
- */
-WPILIB_DLLEXPORT Eigen::SparseMatrix<double> Hessian(Variable& variable,
-                                                     VectorXvar& wrt);
 
 /**
  * std::abs() for Variables.

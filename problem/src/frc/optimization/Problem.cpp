@@ -5,15 +5,31 @@
 #include "frc/optimization/Problem.h"
 
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <vector>
 
+#include <fmt/core.h>
+
 #include "Eigen/IterativeLinearSolvers"
 #include "Eigen/SparseCore"
+#include "frc/autodiff/Gradient.h"
+#include "frc/autodiff/Hessian.h"
+#include "frc/autodiff/Jacobian.h"
 #include "frc/autodiff/Variable.h"
+#include "units/time.h"
 
 using namespace frc;
+
+template <typename... Args>
+constexpr double Max(double a, double b, Args... args) {
+  if constexpr (sizeof...(Args) > 0) {
+    return Max(std::max(a, b), args...);
+  } else {
+    return std::max(a, b);
+  }
+}
 
 Problem::Problem(ProblemType problemType) : m_problemType{problemType} {}
 
@@ -31,14 +47,6 @@ VariableMatrix Problem::DecisionVariable(int rows, int cols) {
   }
 
   return vars;
-}
-
-void Problem::Minimize(const autodiff::Variable& cost) {
-  m_f = cost;
-}
-
-void Problem::Minimize(autodiff::Variable&& cost) {
-  m_f = std::move(cost);
 }
 
 void Problem::Minimize(const VariableMatrix& cost) {
@@ -73,14 +81,13 @@ void Problem::SubjectTo(InequalityConstraints&& constraint) {
   }
 }
 
-Problem::SolverStatus Problem::Solve(double tolerance, int maxIterations) {
-  m_tolerance = tolerance;
-  m_maxIterations = maxIterations;
+SolverStatus Problem::Solve(const SolverConfig& config) {
+  m_config = config;
 
   if (!m_f.has_value() && m_equalityConstraints.rows() == 0 &&
       m_inequalityConstraints.rows() == 0) {
     // If there's no cost function or constraints, do nothing
-    return Problem::SolverStatus::kOk;
+    return SolverStatus::kOk;
   } else if (!m_f.has_value()) {
     // If there's no cost function, make it zero and continue
     m_f = 0.0;
@@ -318,7 +325,7 @@ Eigen::VectorXd Problem::InteriorPoint(
   // TODO: Add problem infeasibility checks; return SolverStatus::kInfeasible
 
   // Barrier parameter scale factor κ_μ for tolerance checks
-  constexpr double kappa_epsilon = 0.1;
+  constexpr double kappa_epsilon = 10.0;
 
   // Barrier parameter scale factor κ_Σ for inequality constraint Lagrange
   // multiplier safeguard
@@ -328,11 +335,11 @@ Eigen::VectorXd Problem::InteriorPoint(
   constexpr double tau_min = 0.995;
 
   // Tuning parameters for μ update
-  constexpr double kappa_mu = 0.1;  // (0, 1)
+  constexpr double kappa_mu = 0.2;  // (0, 1)
   constexpr double theta_mu = 1.5;  // (1, 2)
 
   // Barrier parameter μ
-  double mu = 1;
+  double mu = 0.1;
 
   // Fraction-to-the-boundary rule scale factor τ
   double tau = tau_min;
@@ -371,8 +378,14 @@ Eigen::VectorXd Problem::InteriorPoint(
   // Error estimate E_μ
   double E_mu = std::numeric_limits<double>::infinity();
 
+  autodiff::Hessian hessian{L, m_leaves};
+
   int iterations = 0;
-  while (E_mu > m_tolerance) {
+
+  auto startTime = std::chrono::system_clock::now();
+  auto endTime = startTime;
+
+  while (E_mu > m_config.tolerance) {
     while (E_mu > kappa_epsilon * mu) {
       //     [s₁ 0 ⋯ 0 ]
       // S = [0  ⋱   ⋮ ]
@@ -409,7 +422,7 @@ Eigen::VectorXd Problem::InteriorPoint(
       Eigen::SparseMatrix<double> inverseSigma = S * inverseZ;
 
       // Hₖ = ∇²ₓₓL(x, s, y, z)ₖ
-      Eigen::SparseMatrix<double> H = autodiff::Hessian(L, m_leaves);
+      Eigen::SparseMatrix<double> H = hessian.Calculate();
 
       //         [∇ᵀcₑ₁(x)ₖ]
       // Aₑ(x) = [∇ᵀcₑ₂(x)ₖ]
@@ -451,7 +464,7 @@ Eigen::VectorXd Problem::InteriorPoint(
       }
       Eigen::VectorXd rhs{x.rows() + y.rows()};
       rhs.topRows(x.rows()) =
-          Gradient(m_f.value(), m_leaves) - A_e.transpose() * y +
+          autodiff::Gradient(m_f.value(), m_leaves) - A_e.transpose() * y +
           A_i.transpose() * (sigma * c_i - mu * inverseS * e - z);
       rhs.bottomRows(y.rows()) = c_e;
 
@@ -481,10 +494,10 @@ Eigen::VectorXd Problem::InteriorPoint(
           -sigma * c_i + mu * inverseS * e - sigma * A_i * p_x;
 
       // pₖˢ = μZ⁻¹e − s − Σ⁻¹pₖᶻ
-      Eigen::VectorXd p_s = (mu * inverseZ * e - s - inverseSigma * p_z);
+      Eigen::VectorXd p_s = mu * inverseZ * e - s - inverseSigma * p_z;
 
-      // αₖᵐᵃˣ = max{α ∈ (0, 1] : xₖ + αpₖˣ ≥ (1−τⱼ)xₖ}
-      double alpha_max = FractionToTheBoundaryRule(x, p_x, tau);
+      // αₖᵐᵃˣ = max{α ∈ (0, 1] : sₖ + αpₖˢ ≥ (1−τⱼ)sₖ}
+      double alpha_max = FractionToTheBoundaryRule(s, p_s, tau);
 
       // αₖᶻ = max{α ∈ (0, 1] : zₖ + αpₖᶻ ≥ (1−τⱼ)zₖ}
       double alpha_z = FractionToTheBoundaryRule(z, p_z, tau);
@@ -502,12 +515,12 @@ Eigen::VectorXd Problem::InteriorPoint(
       // barrier term Hessian" Σₖ does not deviate arbitrarily much from the
       // "primal Hessian" μⱼSₖ⁻². We ensure this by resetting
       //
-      //   zₖ₊₁⁽ⁱ⁾ = max{min{zₖ₊₁⁽ⁱ⁾, κ_Σ μⱼ/xₖ₊₁⁽ⁱ⁾}, μⱼ/(κ_Σ xₖ₊₁⁽ⁱ⁾)}
+      //   zₖ₊₁⁽ⁱ⁾ = max{min{zₖ₊₁⁽ⁱ⁾, κ_Σ μⱼ/sₖ₊₁⁽ⁱ⁾}, μⱼ/(κ_Σ sₖ₊₁⁽ⁱ⁾)}
       //
       // for some fixed κ_Σ ≥ 1 after each step. See equation (16) in [2].
       for (int row = 0; row < z.rows(); ++row) {
-        z(row) = std::max(std::min(z(row), kappa_sigma * mu / x(row)),
-                          mu / (kappa_sigma * x(row)));
+        z(row) = std::max(std::min(z(row), kappa_sigma * mu / s(row)),
+                          mu / (kappa_sigma * s(row)));
       }
 
       SetAD(m_leaves, x);
@@ -523,14 +536,58 @@ Eigen::VectorXd Problem::InteriorPoint(
                                         m_inequalityConstraints.size())) /
                    s_max;
 
-      // Update the error estimate. Based on equation (5) in [2].
-      // TODO: Recompute rhs with latest x, s, y, z to avoid an extra iteration
-      E_mu = std::max(rhs.topRows(x.rows()).lpNorm<Eigen::Infinity>() / s_d,
-                      c_e.lpNorm<Eigen::Infinity>());
+      // s_c = max{sₘₐₓ, ||z||₁ / n} / sₘₐₓ
+      double s_c =
+          std::max(s_max, z.lpNorm<1>() / m_inequalityConstraints.size()) /
+          s_max;
+
+      // Update variables needed in error estimate
+      A_e = autodiff::Jacobian(m_equalityConstraints, m_leaves);
+      A_i = autodiff::Jacobian(m_inequalityConstraints, m_leaves);
+      for (int row = 0; row < m_equalityConstraints.rows(); row++) {
+        c_e[row] = m_equalityConstraints(row).Value();
+      }
+      for (int row = 0; row < m_inequalityConstraints.rows(); row++) {
+        c_i[row] = m_inequalityConstraints(row).Value();
+      }
+      triplets.clear();
+      for (int k = 0; k < s.rows(); k++) {
+        triplets.emplace_back(k, k, s[k]);
+      }
+      S.setFromTriplets(triplets.begin(), triplets.end());
+
+      // Update the error estimate using the KKT conditions from equations
+      // (19.5a) through (19.5d) in [1].
+      //
+      //   ∇f − Aₑᵀy − Aᵢᵀz = 0
+      //   Sz − μe = 0
+      //   cₑ = 0
+      //   cᵢ − s = 0
+      //
+      // The error tolerance is the max of the following infinity norms scaled
+      // by s_d and s_c (see equation (5) in [2]).
+      //
+      //   ||∇f − Aₑᵀy − Aᵢᵀz||_∞ / s_d
+      //   ||Sz − μe||_∞ / s_c
+      //   ||cₑ||_∞
+      //   ||cᵢ − s||_∞
+      E_mu = Max((autodiff::Gradient(m_f.value(), m_leaves) -
+                  A_e.transpose() * y - A_i.transpose() * z)
+                         .lpNorm<Eigen::Infinity>() /
+                     s_d,
+                 (S * z - mu * e).lpNorm<Eigen::Infinity>() / s_c,
+                 c_e.lpNorm<Eigen::Infinity>(),
+                 (c_i - s).lpNorm<Eigen::Infinity>());
 
       ++iterations;
-      if (iterations == m_maxIterations) {
+      if (iterations >= m_config.maxIterations) {
         *status = SolverStatus::kMaxIterations;
+        return x;
+      }
+
+      endTime = std::chrono::system_clock::now();
+      if (units::second_t{endTime - startTime} > m_config.timeout) {
+        *status = SolverStatus::kTimeout;
         return x;
       }
     }
@@ -540,7 +597,7 @@ Eigen::VectorXd Problem::InteriorPoint(
     //   μⱼ₊₁ = max{εₜₒₗ/10, min{κ_μ μⱼ, μⱼ^θ_μ}}
     //
     // See equation (7) in [2].
-    mu = std::max(m_tolerance / 10.0,
+    mu = std::max(m_config.tolerance / 10.0,
                   std::min(kappa_mu * mu, std::pow(mu, theta_mu)));
 
     // Update the fraction-to-the-boundary rule scaling factor.
@@ -551,6 +608,7 @@ Eigen::VectorXd Problem::InteriorPoint(
     tau = std::max(tau_min, 1.0 - mu);
   }
 
+  fmt::print("iterations={}\n", iterations);
   *status = SolverStatus::kOk;
   return x;
 }

@@ -8,7 +8,11 @@ namespace frc {
 
 VariableMatrix::VariableMatrix(int rows, int cols)
     : m_rows{rows}, m_cols{cols} {
-  m_storage.resize(rows * cols);
+  for (int row = 0; row < rows; ++row) {
+    for (int col = 0; col < cols; ++col) {
+      m_storage.emplace_back(0.0);
+    }
+  }
 }
 
 VariableMatrix::VariableMatrix(double value) : m_rows{1}, m_cols{1} {
@@ -107,7 +111,7 @@ WPILIB_DLLEXPORT VariableMatrix operator*(const VariableMatrix& lhs,
 
   for (int i = 0; i < lhs.Rows(); ++i) {
     for (int j = 0; j < rhs.Cols(); ++j) {
-      autodiff::Variable sum = autodiff::Constant(0.0);
+      autodiff::Variable sum = 0.0;
       for (int k = 0; k < lhs.Cols(); ++k) {
         sum += lhs.Autodiff(i, k) * rhs.Autodiff(k, j);
       }
@@ -151,7 +155,7 @@ VariableMatrix& VariableMatrix::operator*=(const VariableMatrix& rhs) {
 
   for (int i = 0; i < Rows(); ++i) {
     for (int j = 0; j < rhs.Cols(); ++j) {
-      autodiff::Variable sum = autodiff::Constant(0.0);
+      autodiff::Variable sum = 0.0;
       for (int k = 0; k < Cols(); ++k) {
         sum += Autodiff(i, k) * rhs.Autodiff(k, j);
       }

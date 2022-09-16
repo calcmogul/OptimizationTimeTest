@@ -14,7 +14,7 @@
 int main() {
   auto start = std::chrono::system_clock::now();
 
-  constexpr auto T = 1_s;
+  constexpr auto T = 5_s;
   constexpr auto dt = 5_ms;
   constexpr int N = T / dt;
 

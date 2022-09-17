@@ -1,5 +1,5 @@
 #!/bin/bash
-rm -r src/frc/autodiff src/frc/optimization/ src/wpi/IntrusiveSharedPtr.h
+rm -rf src/frc/autodiff src/frc/optimization/ src/wpi/IntrusiveSharedPtr.h
 cp -r ~/frc/wpilib/allwpilib/wpimath/src/main/native/include/frc/autodiff/ src/frc/
 cp -r ~/frc/wpilib/allwpilib/wpimath/src/main/native/include/frc/optimization/ src/frc/
 cp -r ~/frc/wpilib/allwpilib/wpimath/src/main/native/cpp/autodiff/ src/frc/

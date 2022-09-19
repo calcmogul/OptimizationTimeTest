@@ -60,8 +60,8 @@ int main() {
 
   using std::chrono::duration_cast;
   using std::chrono::microseconds;
-  fmt::print("Setup time={} ms\n",
+  fmt::print("Setup time: {} ms\n",
       duration_cast<microseconds>(end1 - start).count() / 1000.0);
-  fmt::print("Solve time={} ms\n",
+  fmt::print("Solve time: {} ms\n",
       duration_cast<microseconds>(end2 - end1).count() / 1000.0);
 }

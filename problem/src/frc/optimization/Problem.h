@@ -6,6 +6,7 @@
 
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include <wpi/SymbolExports.h>
 
@@ -203,17 +204,17 @@ class WPILIB_DLLEXPORT Problem {
   SolverStatus Solve(const SolverConfig& config = SolverConfig{});
 
  private:
-  // Leaves of the problem's expression tree
-  autodiff::VectorXvar m_leaves;
+  // Decision variables, which are the root of the problem's expression tree
+  std::vector<autodiff::Variable> m_decisionVariables;
 
   // Cost function: f(x)
   std::optional<autodiff::Variable> m_f;
 
   // Equality constraints: cₑ(x) = 0
-  autodiff::VectorXvar m_equalityConstraints;
+  std::vector<autodiff::Variable> m_equalityConstraints;
 
   // Inequality constraints: cᵢ(x) ≥ 0
-  autodiff::VectorXvar m_inequalityConstraints;
+  std::vector<autodiff::Variable> m_inequalityConstraints;
 
   // Problem type
   ProblemType m_problemType;
@@ -221,12 +222,13 @@ class WPILIB_DLLEXPORT Problem {
   SolverConfig m_config;
 
   /**
-   * Grows an autodiff vector without breaking links to old autodiff variables.
+   * Assigns the contents of a double vector to an autodiff vector.
    *
-   * @param v Vector to grow.
-   * @param growth Amount by which to grow the vector.
+   * @param dest The autodiff vector.
+   * @param src The double vector.
    */
-  static void GrowAutodiffVector(autodiff::VectorXvar& v, int growth);
+  static void SetAD(std::vector<autodiff::Variable>& dest,
+                    const Eigen::Ref<const Eigen::VectorXd>& src);
 
   /**
    * Assigns the contents of a double vector to an autodiff vector.

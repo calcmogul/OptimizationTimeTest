@@ -13,7 +13,7 @@ double Gradient(Variable var, Variable& wrt) {
   // Read wpimath/README.md#Reverse_accumulation_automatic_differentiation for
   // background on reverse accumulation automatic differentiation.
 
-  wrt.GetExpression().adjoint = 0.0;
+  wrt.expr->adjoint = 0.0;
 
   // Stack element contains variable and its adjoint
   std::vector<std::tuple<Variable, double>> stack;
@@ -21,29 +21,29 @@ double Gradient(Variable var, Variable& wrt) {
 
   stack.emplace_back(var, 1.0);
   while (!stack.empty()) {
-    auto [var, adjoint] = stack.back();
+    Variable var = std::move(std::get<0>(stack.back()));
+    double adjoint = std::move(std::get<1>(stack.back()));
     stack.pop_back();
 
-    auto& varExpr = var.GetExpression();
-    auto& lhs = varExpr.args[0];
-    auto& rhs = varExpr.args[1];
+    auto& lhs = var.expr->args[0];
+    auto& rhs = var.expr->args[1];
 
-    varExpr.adjoint += adjoint;
+    var.expr->adjoint += adjoint;
 
     if (lhs != nullptr) {
       if (rhs == nullptr) {
         stack.emplace_back(
-            lhs, adjoint * varExpr.gradientValueFuncs[0](lhs->value, 0.0));
+            lhs, adjoint * var.expr->gradientValueFuncs[0](lhs->value, 0.0));
       } else {
-        stack.emplace_back(lhs, adjoint * varExpr.gradientValueFuncs[0](
+        stack.emplace_back(lhs, adjoint * var.expr->gradientValueFuncs[0](
                                               lhs->value, rhs->value));
-        stack.emplace_back(rhs, adjoint * varExpr.gradientValueFuncs[1](
+        stack.emplace_back(rhs, adjoint * var.expr->gradientValueFuncs[1](
                                               lhs->value, rhs->value));
       }
     }
   }
 
-  return wrt.GetExpression().adjoint;
+  return wrt.expr->adjoint;
 }
 
 Eigen::VectorXd Gradient(Variable var, VectorXvar& wrt) {
@@ -51,7 +51,7 @@ Eigen::VectorXd Gradient(Variable var, VectorXvar& wrt) {
   // background on reverse accumulation automatic differentiation.
 
   for (int row = 0; row < wrt.rows(); ++row) {
-    wrt(row).GetExpression().adjoint = 0.0;
+    wrt(row).expr->adjoint = 0.0;
   }
 
   // Stack element contains variable and its adjoint
@@ -60,23 +60,23 @@ Eigen::VectorXd Gradient(Variable var, VectorXvar& wrt) {
 
   stack.emplace_back(var, 1.0);
   while (!stack.empty()) {
-    auto [var, adjoint] = stack.back();
+    Variable var = std::move(std::get<0>(stack.back()));
+    double adjoint = std::move(std::get<1>(stack.back()));
     stack.pop_back();
 
-    auto& varExpr = var.GetExpression();
-    auto& lhs = varExpr.args[0];
-    auto& rhs = varExpr.args[1];
+    auto& lhs = var.expr->args[0];
+    auto& rhs = var.expr->args[1];
 
-    varExpr.adjoint += adjoint;
+    var.expr->adjoint += adjoint;
 
     if (lhs != nullptr) {
       if (rhs == nullptr) {
         stack.emplace_back(
-            lhs, adjoint * varExpr.gradientValueFuncs[0](lhs->value, 0.0));
+            lhs, adjoint * var.expr->gradientValueFuncs[0](lhs->value, 0.0));
       } else {
-        stack.emplace_back(lhs, adjoint * varExpr.gradientValueFuncs[0](
+        stack.emplace_back(lhs, adjoint * var.expr->gradientValueFuncs[0](
                                               lhs->value, rhs->value));
-        stack.emplace_back(rhs, adjoint * varExpr.gradientValueFuncs[1](
+        stack.emplace_back(rhs, adjoint * var.expr->gradientValueFuncs[1](
                                               lhs->value, rhs->value));
       }
     }
@@ -84,7 +84,7 @@ Eigen::VectorXd Gradient(Variable var, VectorXvar& wrt) {
 
   Eigen::VectorXd grad{wrt.rows()};
   for (int row = 0; row < wrt.rows(); ++row) {
-    grad(row) = wrt(row).GetExpression().adjoint;
+    grad(row) = wrt(row).expr->adjoint;
   }
 
   return grad;

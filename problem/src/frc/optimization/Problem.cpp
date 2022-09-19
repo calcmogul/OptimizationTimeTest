@@ -103,9 +103,10 @@ SolverStatus Problem::Solve(const SolverConfig& config) {
   Eigen::VectorXd solution;
   SolverStatus status = SolverStatus::kOk;
   if (m_problemType == ProblemType::kLinear) {
+    // TODO: Precompute gradients once
     solution = InteriorPoint(x, &status);
   } else if (m_problemType == ProblemType::kQuadratic) {
-    // TODO: Use OSQP?
+    // TODO: Precompute gradients and hessian once
     solution = InteriorPoint(x, &status);
   } else if (m_problemType == ProblemType::kNonlinear) {
     solution = InteriorPoint(x, &status);
@@ -318,11 +319,21 @@ Eigen::VectorXd Problem::InteriorPoint(
   //   αₖᵐᵃˣ = max{α ∈ (0, 1] : xₖ + αpₖˣ ≥ (1−τⱼ)xₖ}
   //   αₖᶻ = max{α ∈ (0, 1] : zₖ + αpₖᶻ ≥ (1−τⱼ)zₖ}
   //
-  // [1] Nocedal, J. and Wright, S. Numerical Optimization, 2nd. ed., Ch. 19.
+  // [1] Nocedal, J. and Wright, S. "Numerical Optimization", 2nd. ed., Ch. 19.
   //     Springer, 2006.
-  // [2] http://cepac.cheme.cmu.edu/pasilectures/biegler/ipopt.pdf
+  // [2] Wächter, A. and Biegler, L. "On the implementation of an interior-point
+  //     filter line-search algorithm for large-scale nonlinear programming",
+  //     2005. http://cepac.cheme.cmu.edu/pasilectures/biegler/ipopt.pdf
+  // [3] Byrd, R. and Nocedal J. and Waltz R. "KNITRO: An Integrated Package for
+  //     Nonlinear Optimization", 2005.
+  //     https://users.iems.northwestern.edu/~nocedal/PDFfiles/integrated.pdf
 
-  // TODO: Add problem infeasibility checks; return SolverStatus::kInfeasible
+  if (m_config.diagnostics) {
+    fmt::print("Number of equality constraints: {}\n",
+               m_equalityConstraints.size());
+    fmt::print("Number of inequality constraints: {}\n",
+               m_inequalityConstraints.size());
+  }
 
   // Barrier parameter scale factor κ_μ for tolerance checks
   constexpr double kappa_epsilon = 10.0;
@@ -555,6 +566,29 @@ Eigen::VectorXd Problem::InteriorPoint(
         triplets.emplace_back(k, k, s[k]);
       }
       S.setFromTriplets(triplets.begin(), triplets.end());
+
+      // Check for problem infeasibility. The problem is infeasible if
+      //
+      //   Aₑᵀcₑ → 0
+      //   Aᵢᵀcᵢ⁻ → 0
+      //   ||(cₑ, cᵢ⁻)|| > ε
+      //
+      // where cᵢ⁻ = max(0, −cᵢ).
+      //
+      // See "Infeasibility detection" in section 6 of [3].
+      if (m_equalityConstraints.size() > 0 &&
+          (A_e.transpose() * c_e).norm() < 1e-2 && c_e.norm() > 1e-2) {
+        *status = SolverStatus::kInfeasible;
+        return x;
+      }
+      if (m_inequalityConstraints.size() > 0) {
+        Eigen::VectorXd c_i_minus = (-c_i).cwiseMax(0.0);
+        if ((A_i.transpose() * c_i_minus).norm() < 1e-2 &&
+            c_i_minus.norm() > 1e-2) {
+          *status = SolverStatus::kInfeasible;
+          return x;
+        }
+      }
 
       // Update the error estimate using the KKT conditions from equations
       // (19.5a) through (19.5d) in [1].

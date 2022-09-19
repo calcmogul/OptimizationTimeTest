@@ -12,15 +12,15 @@
 
 using namespace frc::autodiff;
 
-Hessian::Hessian(Variable& variable, VectorXvar& wrt)
-    : m_variable{&variable},
-      m_wrt{&wrt},
-      m_gradientTree{GenerateGradientTree(*m_variable, *m_wrt)} {}
+Hessian::Hessian(Variable variable, VectorXvar wrt)
+    : m_variable{std::move(variable)},
+      m_wrt{std::move(wrt)},
+      m_gradientTree{GenerateGradientTree(m_variable, m_wrt)} {}
 
 Eigen::SparseMatrix<double> Hessian::Calculate() {
   m_triplets.clear();
   for (int row = 0; row < m_gradientTree.rows(); ++row) {
-    Eigen::RowVectorXd g = Gradient(m_gradientTree(row), *m_wrt).transpose();
+    Eigen::RowVectorXd g = Gradient(m_gradientTree(row), m_wrt).transpose();
     for (int col = 0; col < g.cols(); ++col) {
       if (g(col) != 0.0) {
         m_triplets.emplace_back(row, col, g(col));
@@ -28,7 +28,7 @@ Eigen::SparseMatrix<double> Hessian::Calculate() {
     }
   }
 
-  Eigen::SparseMatrix<double> H{m_wrt->rows(), m_wrt->rows()};
+  Eigen::SparseMatrix<double> H{m_wrt.rows(), m_wrt.rows()};
   H.setFromTriplets(m_triplets.begin(), m_triplets.end());
 
   return H;
@@ -39,8 +39,7 @@ VectorXvar Hessian::GenerateGradientTree(Variable& variable, VectorXvar& wrt) {
   // background on reverse accumulation automatic differentiation.
 
   for (int row = 0; row < wrt.rows(); ++row) {
-    wrt(row).GetExpression().adjointExpr =
-        wpi::MakeIntrusiveShared<Expression>(0.0);
+    wrt(row).expr->adjointExpr = wpi::MakeIntrusiveShared<Expression>(0.0);
   }
 
   // Stack element contains variable and its adjoint
@@ -49,31 +48,52 @@ VectorXvar Hessian::GenerateGradientTree(Variable& variable, VectorXvar& wrt) {
 
   stack.emplace_back(variable, wpi::MakeIntrusiveShared<Expression>(1.0));
   while (!stack.empty()) {
-    auto [var, adjoint] = stack.back();
+    Variable var = std::move(std::get<0>(stack.back()));
+    wpi::IntrusiveSharedPtr<Expression> adjoint =
+        std::move(std::get<1>(stack.back()));
     stack.pop_back();
 
-    auto& varExpr = var.GetExpression();
-    auto& lhs = varExpr.args[0];
-    auto& rhs = varExpr.args[1];
+    auto& lhs = var.expr->args[0];
+    auto& rhs = var.expr->args[1];
 
-    if (varExpr.adjointExpr == nullptr) {
-      varExpr.adjointExpr = adjoint;
+    if (var.expr->adjointExpr == nullptr) {
+      var.expr->adjointExpr = adjoint;
     } else {
-      varExpr.adjointExpr = varExpr.adjointExpr + adjoint;
+      var.expr->adjointExpr = var.expr->adjointExpr + adjoint;
     }
 
     if (lhs != nullptr) {
-      stack.emplace_back(lhs, adjoint * varExpr.gradientFuncs[0](lhs, rhs));
+      stack.emplace_back(lhs, adjoint * var.expr->gradientFuncs[0](lhs, rhs));
 
       if (rhs != nullptr) {
-        stack.emplace_back(rhs, adjoint * varExpr.gradientFuncs[1](lhs, rhs));
+        stack.emplace_back(rhs, adjoint * var.expr->gradientFuncs[1](lhs, rhs));
       }
     }
   }
 
   VectorXvar grad{wrt.rows()};
   for (int row = 0; row < wrt.rows(); ++row) {
-    grad(row) = Variable{wrt(row).GetExpression().adjointExpr};
+    grad(row) = Variable{wrt(row).expr->adjointExpr};
+  }
+
+  // Free adjoint storage that's no longer needed
+  stack.emplace_back(variable, nullptr);
+  while (!stack.empty()) {
+    Variable var = std::move(std::get<0>(stack.back()));
+    stack.pop_back();
+
+    auto& lhs = var.expr->args[0];
+    auto& rhs = var.expr->args[1];
+
+    var.expr->adjointExpr = nullptr;
+
+    if (lhs != nullptr) {
+      stack.emplace_back(lhs, nullptr);
+
+      if (rhs != nullptr) {
+        stack.emplace_back(rhs, nullptr);
+      }
+    }
   }
 
   return grad;

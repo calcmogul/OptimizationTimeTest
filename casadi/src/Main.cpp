@@ -1,7 +1,7 @@
 #include <chrono>
-#include <fmt/core.h>
 
 #include <casadi/casadi.hpp>
+#include <fmt/core.h>
 #include <frc/EigenCore.h>
 #include <frc/system/Discretization.h>
 #include <frc/system/plant/LinearSystemId.h>

@@ -1,6 +1,6 @@
 #include <chrono>
-#include <fmt/core.h>
 
+#include <fmt/core.h>
 #include <frc/EigenCore.h>
 #include <frc/optimization/Problem.h>
 #include <frc/system/Discretization.h>

@@ -14,8 +14,11 @@ using namespace frc::autodiff;
 
 Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt)
     : m_variable{std::move(variable)},
-      m_wrt{std::move(wrt)},
-      m_gradientTree{GenerateGradientTree(m_variable, m_wrt)} {}
+      m_wrt{wrt},
+      m_gradientTree{GenerateGradientTree(m_variable, m_wrt)} {
+  // Reserve triplet space for 1% sparsity
+  m_triplets.reserve(m_wrt.rows() * m_wrt.rows() * 0.01);
+}
 
 Eigen::SparseMatrix<double> Hessian::Calculate() {
   m_triplets.clear();
@@ -97,4 +100,10 @@ VectorXvar Hessian::GenerateGradientTree(Variable& variable, VectorXvar& wrt) {
   }
 
   return grad;
+}
+
+void Hessian::Update() {
+  for (int row = 0; row < m_gradientTree.rows(); ++row) {
+    m_gradientTree(row).Update();
+  }
 }

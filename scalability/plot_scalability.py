@@ -25,20 +25,20 @@ def plot_poly2_fit(ax, x, y, color):
     ax.plot(x, poly2(x, a, b, c), color=color, label=label, linestyle="--")
 
 
-def plot_exp_fit(ax, x, y, color):
-    def exp(x, a, b, c):
-        return a * np.exp(b * x) + c
+def plot_exp2_fit(ax, x, y, color):
+    def exp2(x, a, b, c):
+        return a * np.exp2(b * x) + c
 
-    # Fit exponential y = aeᵇˣ + c to x-y data
-    a, b, c = curve_fit(exp, x, y, p0=(1, 1e-6, 1))[0]
+    # Fit exponential y = a2ᵇˣ + c to x-y data
+    a, b, c = curve_fit(exp2, x, y, p0=(1, 1e-6, 1))[0]
 
-    label = f"Fit: y = {a:.4g}e^({b:.4g}x)"
+    label = f"Fit: y = {a:.4g} 2^({b:.4g}x)"
     if c > 0:
         label += f" + {c:.4g}"
     else:
         label += f" - {abs(c):.4g}"
 
-    ax.plot(x, exp(x, a, b, c), color=color, label=label, linestyle="--")
+    ax.plot(x, exp2(x, a, b, c), color=color, label=label, linestyle="--")
 
 
 data = np.genfromtxt("results.csv", delimiter=",", skip_header=1)
@@ -69,10 +69,10 @@ ax2.set_ylabel("Solve time (ms)")
 ax2.grid(visible=True)
 
 ax2.plot(samples, casadi_solve_time, label="CasADi")
-plot_exp_fit(ax2, samples, casadi_solve_time, color="blue")
+plot_exp2_fit(ax2, samples, casadi_solve_time, color="blue")
 
 ax2.plot(samples, problem_solve_time, label="Problem")
-plot_exp_fit(ax2, samples, problem_solve_time, color="orange")
+plot_exp2_fit(ax2, samples, problem_solve_time, color="orange")
 
 ax2.legend()
 

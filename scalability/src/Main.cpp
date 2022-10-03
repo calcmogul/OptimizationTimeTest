@@ -26,7 +26,7 @@ int main() {
 
   fmt::print(
       "Solving flywheel direct transcription from N = 100 to N = 1000.\n");
-  for (int N = 100; N <= 2000; N += 100) {
+  for (int N = 100; N <= 4000; N += 100) {
     scalability << N << ",";
 
     units::second_t dt = T / N;

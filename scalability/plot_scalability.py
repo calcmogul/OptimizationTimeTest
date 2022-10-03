@@ -5,20 +5,24 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 
-def plot_line_fit(ax, x, y, color):
-    def line(x, m, b):
-        return m * x + b
+def plot_poly2_fit(ax, x, y, color):
+    def poly2(x, a, b, c):
+        return a * x**2 + b * x + c
 
-    # Fit line y = mx + b to x-y data
-    m, b = curve_fit(line, x, y, p0=(1, 1))[0]
+    # Fit 2nd degree polynomial y = ax² + bx + c to x-y data
+    a, b, c = curve_fit(poly2, x, y, p0=(1, 1, 1))[0]
 
-    label = f"Fit: y = {m:.4g}x"
+    label = f"Fit: y = {a:.4g}x²"
     if b > 0:
-        label += f" + {b:.4g}"
+        label += f" + {b:.4g}x"
     else:
-        label += f" - {abs(b):.4g}"
+        label += f" - {abs(b):.4g}x"
+    if c > 0:
+        label += f" + {c:.4g}"
+    else:
+        label += f" - {abs(c):.4g}"
 
-    ax.plot(x, line(x, m, b), color=color, label=label, linestyle="--")
+    ax.plot(x, poly2(x, a, b, c), color=color, label=label, linestyle="--")
 
 
 def plot_exp_fit(ax, x, y, color):
@@ -52,10 +56,10 @@ ax1.set_ylabel("Setup time (ms)")
 ax1.grid(visible=True)
 
 ax1.plot(samples, casadi_setup_time, label="CasADi")
-plot_line_fit(ax1, samples, casadi_setup_time, color="blue")
+plot_poly2_fit(ax1, samples, casadi_setup_time, color="blue")
 
 ax1.plot(samples, problem_setup_time, label="Problem")
-plot_exp_fit(ax1, samples, problem_setup_time, color="orange")
+plot_poly2_fit(ax1, samples, problem_setup_time, color="orange")
 
 ax1.legend()
 

@@ -14,6 +14,17 @@
 #include <units/time.h>
 #include <units/voltage.h>
 
+/**
+ * Converts std::chrono::duration to a number of milliseconds rounded to three
+ * decimals.
+ */
+template <typename Rep, typename Period = std::ratio<1>>
+double ToMilliseconds(const std::chrono::duration<Rep, Period>& duration) {
+  using std::chrono::duration_cast;
+  using std::chrono::microseconds;
+  return duration_cast<microseconds>(duration).count() / 1000.0;
+}
+
 int main() {
   constexpr auto T = 5_s;
 
@@ -22,7 +33,9 @@ int main() {
     return 1;
   }
 
-  scalability << "Flywheel samples,CasADi solve time (ms),Problem solve time (ms)\n";
+  scalability << "Flywheel samples,"
+              << "CasADi setup time (ms),CasADi solve time (ms),"
+              << "Problem setup time (ms),Problem solve time (ms)\n";
 
   fmt::print(
       "Solving flywheel direct transcription from N = 100 to N = 1000.\n");
@@ -41,7 +54,9 @@ int main() {
     frc::DiscretizeAB<1, 1>(system.A(), system.B(), dt, &A, &B);
 
     {
-      fmt::print("CasADi (N = {})...", N);
+      fmt::print(stderr, "CasADi (N = {})...", N);
+
+      auto setupStartTime = std::chrono::system_clock::now();
 
       casadi::MX caA = A(0, 0);
       casadi::MX caB = B(0, 0);
@@ -70,21 +85,24 @@ int main() {
 
       opti.solver("ipopt");
 
-      auto start = std::chrono::system_clock::now();
-      opti.solve();
-      auto end = std::chrono::system_clock::now();
+      auto setupEndTime = std::chrono::system_clock::now();
 
-      using std::chrono::duration_cast;
-      using std::chrono::microseconds;
-      double solveTime =
-          duration_cast<microseconds>(end - start).count() / 1000.0;
-      scalability << solveTime;
+      auto solveStartTime = std::chrono::system_clock::now();
+      opti.solve();
+      auto solveEndTime = std::chrono::system_clock::now();
+
+      scalability << ToMilliseconds(setupEndTime - setupStartTime) << ","
+                  << ToMilliseconds(solveEndTime - solveStartTime);
+
+      fmt::print(stderr, " done.\n");
     }
 
     scalability << ",";
 
     {
-      fmt::print("Problem (N = {})...", N);
+      fmt::print(stderr, "Problem (N = {})...", N);
+
+      auto setupStartTime = std::chrono::system_clock::now();
 
       frc::Problem problem;
       auto X = problem.DecisionVariable(1, N + 1);
@@ -108,17 +126,16 @@ int main() {
       }
       problem.Minimize(J);
 
-      auto start = std::chrono::system_clock::now();
+      auto setupEndTime = std::chrono::system_clock::now();
+
+      auto solveStartTime = std::chrono::system_clock::now();
       problem.Solve();
-      auto end = std::chrono::system_clock::now();
+      auto solveEndTime = std::chrono::system_clock::now();
 
-      fmt::print(" done.\n");
+      scalability << ToMilliseconds(setupEndTime - setupStartTime) << ","
+                  << ToMilliseconds(solveEndTime - solveStartTime);
 
-      using std::chrono::duration_cast;
-      using std::chrono::microseconds;
-      double solveTime =
-          duration_cast<microseconds>(end - start).count() / 1000.0;
-      scalability << solveTime;
+      fmt::print(stderr, " done.\n");
     }
 
     scalability << "\n";

@@ -10,7 +10,7 @@ def plot_poly2_fit(ax, x, y, color):
         return a * x**2 + b * x + c
 
     # Fit 2nd degree polynomial y = ax² + bx + c to x-y data
-    a, b, c = curve_fit(poly2, x, y, p0=(1, 1, 1))[0]
+    a, b, c = curve_fit(poly2, x, y, p0=(1, 1, 1), bounds=([0, 0, 0], np.inf))[0]
 
     label = f"Fit: y = {a:.4g}x²"
     if b > 0:

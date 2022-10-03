@@ -1,5 +1,6 @@
 #include <chrono>
 #include <fstream>
+#include <vector>
 
 #include <fmt/core.h>
 
@@ -37,9 +38,22 @@ int main() {
               << "CasADi setup time (ms),CasADi solve time (ms),"
               << "Problem setup time (ms),Problem solve time (ms)\n";
 
+  std::vector<int> Ns;
+  for (int N = 1; N < 10; ++N) {
+    Ns.emplace_back(N);
+  }
+  for (int N = 10; N < 100; N += 10) {
+    Ns.emplace_back(N);
+  }
+  for (int N = 100; N < 4000; N += 100) {
+    Ns.emplace_back(N);
+  }
+  Ns.emplace_back(4000);
+
   fmt::print(
-      "Solving flywheel direct transcription from N = 100 to N = 1000.\n");
-  for (int N = 100; N <= 4000; N += 100) {
+      "Solving flywheel direct transcription from N = {} to N = {}.\n",
+      Ns.front(), Ns.back());
+  for (int N : Ns) {
     scalability << N << ",";
 
     units::second_t dt = T / N;
@@ -83,7 +97,7 @@ int main() {
       }
       opti.minimize(J);
 
-      opti.solver("ipopt");
+      opti.solver("ipopt", {{"print_time", 0}}, {{"print_level", 0}, {"sb", "yes"}});
 
       auto setupEndTime = std::chrono::system_clock::now();
 

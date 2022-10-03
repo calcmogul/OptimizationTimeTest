@@ -32,14 +32,14 @@ double ToMilliseconds(const std::chrono::duration<Rep, Period>& duration) {
 int main() {
   constexpr auto T = 5_s;
 
-  std::ofstream scalability{"Flywheel problem scalability.csv"};
-  if (!scalability.is_open()) {
+  std::ofstream results{"results.csv"};
+  if (!results.is_open()) {
     return 1;
   }
 
-  scalability << "Flywheel samples,"
-              << "CasADi setup time (ms),CasADi solve time (ms),"
-              << "Problem setup time (ms),Problem solve time (ms)\n";
+  results << "Flywheel samples,"
+          << "CasADi setup time (ms),CasADi solve time (ms),"
+          << "Problem setup time (ms),Problem solve time (ms)\n";
 
   std::vector<int> Ns;
   for (int N = 1; N < 10; ++N) {
@@ -56,7 +56,7 @@ int main() {
   fmt::print("Solving flywheel direct transcription from N = {} to N = {}.\n",
              Ns.front(), Ns.back());
   for (int N : Ns) {
-    scalability << N << ",";
+    results << N << ",";
 
     units::second_t dt = T / N;
 
@@ -108,13 +108,13 @@ int main() {
       opti.solve();
       auto solveEndTime = std::chrono::system_clock::now();
 
-      scalability << ToMilliseconds(setupEndTime - setupStartTime) << ","
-                  << ToMilliseconds(solveEndTime - solveStartTime);
+      results << ToMilliseconds(setupEndTime - setupStartTime) << ","
+              << ToMilliseconds(solveEndTime - solveStartTime);
 
       fmt::print(stderr, " done.\n");
     }
 
-    scalability << ",";
+    results << ",";
 
     {
       fmt::print(stderr, "Problem (N = {})...", N);
@@ -149,12 +149,12 @@ int main() {
       problem.Solve();
       auto solveEndTime = std::chrono::system_clock::now();
 
-      scalability << ToMilliseconds(setupEndTime - setupStartTime) << ","
-                  << ToMilliseconds(solveEndTime - solveStartTime);
+      results << ToMilliseconds(setupEndTime - setupStartTime) << ","
+              << ToMilliseconds(solveEndTime - solveStartTime);
 
       fmt::print(stderr, " done.\n");
     }
 
-    scalability << "\n";
+    results << "\n";
   }
 }

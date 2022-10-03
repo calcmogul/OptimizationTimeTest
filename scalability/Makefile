@@ -1,4 +1,4 @@
-EXEC := OptimizationTimeTest
+EXEC := ScalabilityTest
 
 CPP := g++
 CPPFLAGS := -O2 -Wall -std=c++17 -Isrc -I/usr/include/eigen3

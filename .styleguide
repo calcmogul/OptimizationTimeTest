@@ -1,0 +1,31 @@
+cppHeaderFileInclude {
+  \.h$
+  \.hpp$
+  \.inc$
+}
+
+cppSrcFileInclude {
+  \.cpp$
+}
+
+modifiableFileExclude {
+  src/frc/
+  src/wpi/
+  units/
+  gradlew
+}
+
+generatedFileExclude {
+}
+
+repoRootNameOverride {
+  wpilib
+}
+
+includeOtherLibs {
+  ^Eigen/
+  ^frc/
+  ^fmt/
+  ^units/
+  ^wpi/
+}

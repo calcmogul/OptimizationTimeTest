@@ -1,10 +1,13 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
 #include <chrono>
 #include <fstream>
 #include <vector>
 
-#include <fmt/core.h>
-
 #include <casadi/casadi.hpp>
+#include <fmt/core.h>
 #include <frc/EigenCore.h>
 #include <frc/optimization/Problem.h>
 #include <frc/system/Discretization.h>
@@ -50,9 +53,8 @@ int main() {
   }
   Ns.emplace_back(4000);
 
-  fmt::print(
-      "Solving flywheel direct transcription from N = {} to N = {}.\n",
-      Ns.front(), Ns.back());
+  fmt::print("Solving flywheel direct transcription from N = {} to N = {}.\n",
+             Ns.front(), Ns.back());
   for (int N : Ns) {
     scalability << N << ",";
 
@@ -97,7 +99,8 @@ int main() {
       }
       opti.minimize(J);
 
-      opti.solver("ipopt", {{"print_time", 0}}, {{"print_level", 0}, {"sb", "yes"}});
+      opti.solver("ipopt", {{"print_time", 0}},
+                  {{"print_level", 0}, {"sb", "yes"}});
 
       auto setupEndTime = std::chrono::system_clock::now();
 

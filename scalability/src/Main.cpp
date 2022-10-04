@@ -3,6 +3,7 @@
 // the WPILib BSD license file in the root directory of this project.
 
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <vector>
 
@@ -42,23 +43,16 @@ int main() {
           << "Problem setup time (ms),Problem solve time (ms)\n";
   std::flush(results);
 
+  constexpr int kMaxPower = 4;
+
   std::vector<int> Ns;
-  for (int N = 1e0; N < 1e1; N += 1e0) {
-    Ns.emplace_back(N);
+  for (int power = 0; power < kMaxPower; ++power) {
+    for (int N = std::pow(10, power); N < std::pow(10, power + 1);
+         N += std::pow(10, power)) {
+      Ns.emplace_back(N);
+    }
   }
-  for (int N = 1e1; N < 1e2; N += 1e1) {
-    Ns.emplace_back(N);
-  }
-  for (int N = 1e2; N < 1e3; N += 1e2) {
-    Ns.emplace_back(N);
-  }
-  for (int N = 1e3; N < 1e4; N += 1e3) {
-    Ns.emplace_back(N);
-  }
-  for (int N = 1e4; N < 1e5; N += 1e4) {
-    Ns.emplace_back(N);
-  }
-  Ns.emplace_back(1e5);
+  Ns.emplace_back(std::pow(10, kMaxPower));
 
   fmt::print("Solving flywheel direct transcription from N = {} to N = {}.\n",
              Ns.front(), Ns.back());

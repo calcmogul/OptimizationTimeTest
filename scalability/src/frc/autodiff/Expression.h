@@ -16,13 +16,15 @@ namespace frc::autodiff {
 enum class ExpressionType { kNone, kConstant, kLinear, kQuadratic, kNonlinear };
 
 struct WPILIB_DLLEXPORT Expression {
-  using BinaryFuncDouble = double (*)(double, double);
-  using BinaryFuncExpr = wpi::IntrusiveSharedPtr<Expression> (*)(
-      const wpi::IntrusiveSharedPtr<Expression>&,
-      const wpi::IntrusiveSharedPtr<Expression>&);
   using BinaryFuncType =
       ExpressionType (*)(const wpi::IntrusiveSharedPtr<Expression>&,
                          const wpi::IntrusiveSharedPtr<Expression>&);
+  using BinaryFuncDouble = double (*)(double, double);
+  using TrinaryFuncDouble = double (*)(double, double, double);
+  using TrinaryFuncExpr = wpi::IntrusiveSharedPtr<Expression> (*)(
+      const wpi::IntrusiveSharedPtr<Expression>&,
+      const wpi::IntrusiveSharedPtr<Expression>&,
+      const wpi::IntrusiveSharedPtr<Expression>&);
 
   double value = 0.0;
 
@@ -41,19 +43,36 @@ struct WPILIB_DLLEXPORT Expression {
   // used to update the node's value.
   BinaryFuncDouble valueFunc = [](double, double) { return 0.0; };
 
-  // Gradients with respect to each argument
-  std::array<BinaryFuncDouble, 2> gradientValueFuncs{
-      [](double, double) { return 0.0; }, [](double, double) { return 0.0; }};
+  /// Functions returning double adjoints of the children expressions.
+  ///
+  /// Parameters:
+  /// <ul>
+  ///   <li>lhs: Left argument to binary operator.</li>
+  ///   <li>rhs: Right argument to binary operator.</li>
+  ///   <li>parentAdjoint: Adjoint of parent expression.</li>
+  /// </ul>
+  std::array<TrinaryFuncDouble, 2> gradientValueFuncs{
+      [](double, double, double) { return 0.0; },
+      [](double, double, double) { return 0.0; }};
 
-  // Gradients with respect to each argument
-  std::array<BinaryFuncExpr, 2> gradientFuncs{
+  /// Functions returning Variable adjoints of the children expressions.
+  ///
+  /// Parameters:
+  /// <ul>
+  ///   <li>lhs: Left argument to binary operator.</li>
+  ///   <li>rhs: Right argument to binary operator.</li>
+  ///   <li>parentAdjoint: Adjoint of parent expression.</li>
+  /// </ul>
+  std::array<TrinaryFuncExpr, 2> gradientFuncs{
       [](const wpi::IntrusiveSharedPtr<Expression>&,
+         const wpi::IntrusiveSharedPtr<Expression>&,
          const wpi::IntrusiveSharedPtr<Expression>&) {
-        return wpi::MakeIntrusiveShared<Expression>(0.0);
+        return wpi::IntrusiveSharedPtr<Expression>{};
       },
       [](const wpi::IntrusiveSharedPtr<Expression>&,
+         const wpi::IntrusiveSharedPtr<Expression>&,
          const wpi::IntrusiveSharedPtr<Expression>&) {
-        return wpi::MakeIntrusiveShared<Expression>(0.0);
+        return wpi::IntrusiveSharedPtr<Expression>{};
       }};
 
   // Expression arguments
@@ -88,8 +107,8 @@ struct WPILIB_DLLEXPORT Expression {
    * @param lhs Unary operator's operand.
    */
   Expression(BinaryFuncType typeFunc, BinaryFuncDouble valueFunc,
-             BinaryFuncDouble lhsGradientValueFunc,
-             BinaryFuncExpr lhsGradientFunc,
+             TrinaryFuncDouble lhsGradientValueFunc,
+             TrinaryFuncExpr lhsGradientFunc,
              wpi::IntrusiveSharedPtr<Expression> lhs);
 
   /**
@@ -105,9 +124,9 @@ struct WPILIB_DLLEXPORT Expression {
    * @param rhs Binary operator's right operand.
    */
   Expression(BinaryFuncType typeFunc, BinaryFuncDouble valueFunc,
-             BinaryFuncDouble lhsGradientValueFunc,
-             BinaryFuncDouble rhsGradientValueFunc,
-             BinaryFuncExpr lhsGradientFunc, BinaryFuncExpr rhsGradientFunc,
+             TrinaryFuncDouble lhsGradientValueFunc,
+             TrinaryFuncDouble rhsGradientValueFunc,
+             TrinaryFuncExpr lhsGradientFunc, TrinaryFuncExpr rhsGradientFunc,
              wpi::IntrusiveSharedPtr<Expression> lhs,
              wpi::IntrusiveSharedPtr<Expression> rhs);
 

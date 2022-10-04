@@ -22,7 +22,14 @@ def plot_poly2_fit(ax, x, y, color):
     else:
         label += f" - {abs(c):.4g}"
 
-    ax.plot(x, poly2(x, a, b, c), color=color, label=label, linestyle="--")
+    resampled_x = np.arange(0, x[-1], 100)
+    ax.plot(
+        resampled_x,
+        poly2(resampled_x, a, b, c),
+        color=color,
+        label=label,
+        linestyle="--",
+    )
 
 
 def plot_exp2_fit(ax, x, y, color, force_intercept=False):
@@ -40,7 +47,14 @@ def plot_exp2_fit(ax, x, y, color, force_intercept=False):
         else:
             label += f" - {abs(c):.4g}"
 
-        ax.plot(x, exp2(x, a, b, c), color=color, label=label, linestyle="--")
+        resampled_x = np.arange(0, x[-1], 100)
+        ax.plot(
+            resampled_x,
+            exp2(resampled_x, a, b, c),
+            color=color,
+            label=label,
+            linestyle="--",
+        )
     else:
 
         def exp2(x, a, b):
@@ -49,9 +63,10 @@ def plot_exp2_fit(ax, x, y, color, force_intercept=False):
         # Fit exponential y = c(2ᵇˣ − 1) to x-y data
         a, b = curve_fit(exp2, x, y, p0=(1, 1e-6))[0]
 
+        resampled_x = np.arange(0, x[-1], 100)
         ax.plot(
-            x,
-            exp2(x, a, b),
+            resampled_x,
+            exp2(resampled_x, a, b),
             color=color,
             label=f"Fit: y = {a:.4g} (2^({b:.4g}x) - 1)",
             linestyle="--",

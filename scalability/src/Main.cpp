@@ -40,23 +40,31 @@ int main() {
   results << "Flywheel samples,"
           << "CasADi setup time (ms),CasADi solve time (ms),"
           << "Problem setup time (ms),Problem solve time (ms)\n";
+  std::flush(results);
 
   std::vector<int> Ns;
-  for (int N = 1; N < 10; ++N) {
+  for (int N = 1e0; N < 1e1; N += 1e0) {
     Ns.emplace_back(N);
   }
-  for (int N = 10; N < 100; N += 10) {
+  for (int N = 1e1; N < 1e2; N += 1e1) {
     Ns.emplace_back(N);
   }
-  for (int N = 100; N < 4000; N += 100) {
+  for (int N = 1e2; N < 1e3; N += 1e2) {
     Ns.emplace_back(N);
   }
-  Ns.emplace_back(4000);
+  for (int N = 1e3; N < 1e4; N += 1e3) {
+    Ns.emplace_back(N);
+  }
+  for (int N = 1e4; N < 1e5; N += 1e4) {
+    Ns.emplace_back(N);
+  }
+  Ns.emplace_back(1e5);
 
   fmt::print("Solving flywheel direct transcription from N = {} to N = {}.\n",
              Ns.front(), Ns.back());
   for (int N : Ns) {
     results << N << ",";
+    std::flush(results);
 
     units::second_t dt = T / N;
 
@@ -104,17 +112,21 @@ int main() {
 
       auto setupEndTime = std::chrono::system_clock::now();
 
+      results << ToMilliseconds(setupEndTime - setupStartTime) << ",";
+      std::flush(results);
+
       auto solveStartTime = std::chrono::system_clock::now();
       opti.solve();
       auto solveEndTime = std::chrono::system_clock::now();
 
-      results << ToMilliseconds(setupEndTime - setupStartTime) << ","
-              << ToMilliseconds(solveEndTime - solveStartTime);
+      results << ToMilliseconds(solveEndTime - solveStartTime);
+      std::flush(results);
 
       fmt::print(stderr, " done.\n");
     }
 
     results << ",";
+    std::flush(results);
 
     {
       fmt::print(stderr, "Problem (N = {})...", N);
@@ -145,16 +157,20 @@ int main() {
 
       auto setupEndTime = std::chrono::system_clock::now();
 
+      results << ToMilliseconds(setupEndTime - setupStartTime) << ",";
+      std::flush(results);
+
       auto solveStartTime = std::chrono::system_clock::now();
       problem.Solve();
       auto solveEndTime = std::chrono::system_clock::now();
 
-      results << ToMilliseconds(setupEndTime - setupStartTime) << ","
-              << ToMilliseconds(solveEndTime - solveStartTime);
+      results << ToMilliseconds(solveEndTime - solveStartTime);
+      std::flush(results);
 
       fmt::print(stderr, " done.\n");
     }
 
     results << "\n";
+    std::flush(results);
   }
 }

@@ -5,13 +5,11 @@
 #include "OptimizationProblem.h"
 
 #include <frc/EigenCore.h>
-#include <frc/optimization/OptimizationProblem.h>
 #include <frc/system/Discretization.h>
 #include <frc/system/plant/LinearSystemId.h>
 #include <units/angle.h>
 #include <units/angular_acceleration.h>
 #include <units/angular_velocity.h>
-#include <units/time.h>
 #include <units/voltage.h>
 
 frc::OptimizationProblem FlywheelOptimizationProblem(units::second_t dt,

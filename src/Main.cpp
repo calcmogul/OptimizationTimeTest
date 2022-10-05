@@ -81,7 +81,7 @@ int main() {
 
     fmt::print(stderr, "CasADi (N = {})...", N);
     RunTest<casadi::Opti>(
-        results, [=] { return CasADiFlywheel(dt, N); },
+        results, [=] { return FlywheelCasADi(dt, N); },
         [](casadi::Opti& opti) { opti.solve(); });
     fmt::print(stderr, " done.\n");
 

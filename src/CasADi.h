@@ -13,4 +13,4 @@
  * @param dt Timestep duration.
  * @param N Number of samples in the problem.
  */
-casadi::Opti CasADiFlywheel(units::second_t dt, int N);
+casadi::Opti FlywheelCasADi(units::second_t dt, int N);

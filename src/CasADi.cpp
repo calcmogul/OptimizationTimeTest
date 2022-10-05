@@ -9,10 +9,9 @@
 #include <units/angle.h>
 #include <units/angular_acceleration.h>
 #include <units/angular_velocity.h>
-#include <units/time.h>
 #include <units/voltage.h>
 
-casadi::Opti CasADiFlywheel(units::second_t dt, int N) {
+casadi::Opti FlywheelCasADi(units::second_t dt, int N) {
   // Flywheel model:
   // States: [velocity]
   // Inputs: [voltage]

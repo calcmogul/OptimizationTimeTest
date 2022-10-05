@@ -19,6 +19,8 @@ class WPILIB_DLLEXPORT Mat;
 template <typename Mat>
 class VariableBlock {
  public:
+  VariableBlock(Mat& mat);  // NOLINT
+
   VariableBlock(Mat& mat, int rowOffset, int colOffset, int blockRows,
                 int blockCols);
 
@@ -63,6 +65,24 @@ class VariableBlock {
     for (int row = 0; row < m_blockRows; ++row) {
       for (int col = 0; col < m_blockCols; ++col) {
         Autodiff(row, col) = std::move(values(row, col));
+      }
+    }
+    return *this;
+  }
+
+  VariableBlock<Mat>& operator=(const Mat& values) {
+    for (int row = 0; row < m_blockRows; ++row) {
+      for (int col = 0; col < m_blockCols; ++col) {
+        Autodiff(row, col) = values.Autodiff(row, col);
+      }
+    }
+    return *this;
+  }
+
+  VariableBlock<Mat>& operator=(Mat&& values) {
+    for (int row = 0; row < m_blockRows; ++row) {
+      for (int col = 0; col < m_blockCols; ++col) {
+        Autodiff(row, col) = std::move(values.Autodiff(row, col));
       }
     }
     return *this;
@@ -142,7 +162,15 @@ class VariableBlock {
   VariableBlock& operator*=(double rhs);
 
   /**
-   * Compound matrix division-assignment operator (only enabled when lhs
+   * Compound matrix division-assignment operator (only enabled when rhs
+   * is a scalar).
+   *
+   * @param rhs Variable to divide.
+   */
+  VariableBlock<Mat>& operator/=(const VariableBlock<Mat>& rhs);
+
+  /**
+   * Compound matrix division-assignment operator (only enabled when rhs
    * is a scalar).
    *
    * @param rhs Variable to divide.

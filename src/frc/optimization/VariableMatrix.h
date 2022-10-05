@@ -149,6 +149,23 @@ class WPILIB_DLLEXPORT VariableMatrix {
                                                   int blockCols) const;
 
   /**
+   * Returns a segment of the variable vector.
+   *
+   * @param offset The offset of the segment.
+   * @param length The length of the segment.
+   */
+  VariableBlock<VariableMatrix> Segment(int offset, int length);
+
+  /**
+   * Returns a segment of the variable vector.
+   *
+   * @param offset The offset of the segment.
+   * @param length The length of the segment.
+   */
+  const VariableBlock<const VariableMatrix> Segment(int offset,
+                                                    int length) const;
+
+  /**
    * Returns a row slice of the variable matrix.
    *
    * @param row The row to slice.
@@ -273,6 +290,15 @@ class WPILIB_DLLEXPORT VariableMatrix {
   VariableMatrix& operator*=(double rhs);
 
   /**
+   * Binary division operator (only enabled when rhs is a scalar).
+   *
+   * @param lhs Operator left-hand side.
+   * @param rhs Operator right-hand side.
+   */
+  friend WPILIB_DLLEXPORT VariableMatrix operator/(const VariableMatrix& lhs,
+                                                   const VariableMatrix& rhs);
+
+  /**
    * Binary division operator.
    *
    * @param lhs Operator left-hand side.
@@ -282,7 +308,15 @@ class WPILIB_DLLEXPORT VariableMatrix {
                                                    double rhs);
 
   /**
-   * Compound matrix division-assignment operator (only enabled when lhs
+   * Compound matrix division-assignment operator (only enabled when rhs
+   * is a scalar).
+   *
+   * @param rhs Variable to divide.
+   */
+  VariableMatrix& operator/=(const VariableMatrix& rhs);
+
+  /**
+   * Compound matrix division-assignment operator (only enabled when rhs
    * is a scalar).
    *
    * @param rhs Variable to divide.

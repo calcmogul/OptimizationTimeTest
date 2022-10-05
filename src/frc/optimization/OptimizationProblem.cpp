@@ -251,6 +251,23 @@ SolverStatus OptimizationProblem::Solve(const SolverConfig& config) {
   // Solve the optimization problem
   Eigen::VectorXd solution = InteriorPoint(x, &status);
 
+  if (m_config.diagnostics) {
+    fmt::print("Exit condition: ");
+    if (status.exitCondition == SolverExitCondition::kOk) {
+      fmt::print("optimal solution found");
+    } else if (status.exitCondition == SolverExitCondition::kTooFewDOFs) {
+      fmt::print("problem has too few degrees of freedom");
+    } else if (status.exitCondition ==
+               SolverExitCondition::kLocallyInfeasible) {
+      fmt::print("problem is locally infeasible");
+    } else if (status.exitCondition == SolverExitCondition::kMaxIterations) {
+      fmt::print("maximum iterations exceeded");
+    } else if (status.exitCondition == SolverExitCondition::kTimeout) {
+      fmt::print("solution returned after timeout");
+    }
+    fmt::print("\n");
+  }
+
   // Assign the solution to the original Variable instances
   SetAD(m_decisionVariables, solution);
 
@@ -376,7 +393,7 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
   // where αₖᵐᵃˣ and αₖᶻ are computed via the fraction-to-the-boundary rule
   // shown in equations (15a) and (15b) of [2].
   //
-  //   αₖᵐᵃˣ = max(α ∈ (0, 1] : xₖ + αpₖˣ ≥ (1−τⱼ)xₖ)
+  //   αₖᵐᵃˣ = max(α ∈ (0, 1] : sₖ + αpₖˢ ≥ (1−τⱼ)sₖ)
   //   αₖᶻ = max(α ∈ (0, 1] : zₖ + αpₖᶻ ≥ (1−τⱼ)zₖ)
   //
   // [1] Nocedal, J. and Wright, S. "Numerical Optimization", 2nd. ed., Ch. 19.
@@ -575,21 +592,6 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
 
       fmt::print("Solve time: {} ms\n\n",
                  ToMilliseconds(outerEndTime - outerStartTime));
-
-      fmt::print("Exit condition: ");
-      if (status->exitCondition == SolverExitCondition::kOk) {
-        fmt::print("optimal solution found");
-      } else if (status->exitCondition == SolverExitCondition::kTooFewDOFs) {
-        fmt::print("problem has too few degrees of freedom");
-      } else if (status->exitCondition ==
-                 SolverExitCondition::kLocallyInfeasible) {
-        fmt::print("problem is locally infeasible");
-      } else if (status->exitCondition == SolverExitCondition::kMaxIterations) {
-        fmt::print("maximum iterations exceeded");
-      } else if (status->exitCondition == SolverExitCondition::kTimeout) {
-        fmt::print("solution returned after timeout");
-      }
-      fmt::print("\n");
     }
   }};
 

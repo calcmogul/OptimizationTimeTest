@@ -89,6 +89,15 @@ const VariableBlock<const VariableMatrix> VariableMatrix::Block(
   return VariableBlock{*this, rowOffset, colOffset, blockRows, blockCols};
 }
 
+VariableBlock<VariableMatrix> VariableMatrix::Segment(int offset, int length) {
+  return Block(0, offset, 1, length);
+}
+
+const VariableBlock<const VariableMatrix> VariableMatrix::Segment(
+    int offset, int length) const {
+  return Block(0, offset, 1, length);
+}
+
 VariableBlock<VariableMatrix> VariableMatrix::Row(int row) {
   return Block(row, 0, 1, Cols());
 }
@@ -179,6 +188,21 @@ VariableMatrix& VariableMatrix::operator*=(double rhs) {
 }
 
 WPILIB_DLLEXPORT VariableMatrix operator/(const VariableMatrix& lhs,
+                                          const VariableMatrix& rhs) {
+  assert(rhs.Rows() == 1 && rhs.Cols() == 1);
+
+  VariableMatrix result{lhs.Rows(), lhs.Cols()};
+
+  for (int row = 0; row < result.Rows(); ++row) {
+    for (int col = 0; col < result.Cols(); ++col) {
+      result.Autodiff(row, col) = lhs.Autodiff(row, col) / rhs.Autodiff(0, 0);
+    }
+  }
+
+  return result;
+}
+
+WPILIB_DLLEXPORT VariableMatrix operator/(const VariableMatrix& lhs,
                                           double rhs) {
   VariableMatrix result{lhs.Rows(), lhs.Cols()};
 
@@ -191,6 +215,16 @@ WPILIB_DLLEXPORT VariableMatrix operator/(const VariableMatrix& lhs,
   }
 
   return result;
+}
+
+VariableMatrix& VariableMatrix::operator/=(const VariableMatrix& rhs) {
+  for (int row = 0; row < Rows(); ++row) {
+    for (int col = 0; col < Cols(); ++col) {
+      Autodiff(row, col) /= rhs.Autodiff(0, 0);
+    }
+  }
+
+  return *this;
 }
 
 VariableMatrix& VariableMatrix::operator/=(double rhs) {

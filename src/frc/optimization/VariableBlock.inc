@@ -4,9 +4,15 @@
 
 #pragma once
 
+#include <type_traits>
+
 #include "frc/optimization/VariableBlock.h"
 
 namespace frc {
+
+template <typename Mat>
+VariableBlock<Mat>::VariableBlock(Mat& mat)
+    : m_mat{&mat}, m_blockRows{mat.Rows()}, m_blockCols{mat.Cols()} {}
 
 template <typename Mat>
 VariableBlock<Mat>::VariableBlock(Mat& mat, int rowOffset, int colOffset,
@@ -113,6 +119,20 @@ VariableBlock<Mat>& VariableBlock<Mat>::operator*=(double rhs) {
 }
 
 template <typename Mat>
+VariableBlock<Mat>& VariableBlock<Mat>::operator/=(
+    const VariableBlock<Mat>& rhs) {
+  assert(rhs.Rows() == 1 && rhs.Cols() == 1);
+
+  for (int row = 0; row < Rows(); ++row) {
+    for (int col = 0; col < Cols(); ++col) {
+      Autodiff(row, col) /= rhs.Autodiff(0, 0);
+    }
+  }
+
+  return *this;
+}
+
+template <typename Mat>
 VariableBlock<Mat>& VariableBlock<Mat>::operator/=(double rhs) {
   for (int row = 0; row < Rows(); ++row) {
     for (int col = 0; col < Cols(); ++col) {
@@ -208,7 +228,7 @@ const autodiff::Variable& VariableBlock<Mat>::Autodiff(int row, int col) const {
 
 template <typename Mat>
 Mat abs(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -221,7 +241,7 @@ Mat abs(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat acos(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -234,7 +254,7 @@ Mat acos(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat asin(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -247,7 +267,7 @@ Mat asin(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat atan(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -260,7 +280,7 @@ Mat atan(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat atan2(const VariableBlock<Mat>& y, const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -274,7 +294,7 @@ Mat atan2(const VariableBlock<Mat>& y, const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat cos(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -300,7 +320,7 @@ Mat cosh(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat erf(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -313,7 +333,7 @@ Mat erf(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat exp(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -326,7 +346,7 @@ Mat exp(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat hypot(const VariableBlock<Mat>& x, const VariableBlock<Mat>& y) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -340,7 +360,7 @@ Mat hypot(const VariableBlock<Mat>& x, const VariableBlock<Mat>& y) {
 
 template <typename Mat>
 Mat log(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -353,7 +373,7 @@ Mat log(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat log10(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -380,7 +400,7 @@ Mat pow(const VariableBlock<Mat>& base, const VariableBlock<Mat>& power) {
 
 template <typename Mat>
 Mat sin(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -393,7 +413,7 @@ Mat sin(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat sinh(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -406,7 +426,7 @@ Mat sinh(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat sqrt(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -419,7 +439,7 @@ Mat sqrt(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat tan(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {
@@ -432,7 +452,7 @@ Mat tan(const VariableBlock<Mat>& x) {
 
 template <typename Mat>
 Mat tanh(const VariableBlock<Mat>& x) {
-  Mat result{x.Rows(), x.Cols()};
+  std::remove_cv_t<Mat> result{x.Rows(), x.Cols()};
 
   for (int row = 0; row < result.Rows(); ++row) {
     for (int col = 0; col < result.Cols(); ++col) {

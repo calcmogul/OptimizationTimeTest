@@ -4,12 +4,15 @@
 
 #include "CasADi.h"
 
+#include <frc/EigenCore.h>
 #include <frc/system/Discretization.h>
+#include <frc/system/NumericalIntegration.h>
 #include <frc/system/plant/LinearSystemId.h>
 #include <units/angle.h>
 #include <units/angular_acceleration.h>
 #include <units/angular_velocity.h>
 #include <units/voltage.h>
+#include <wpi/numbers>
 
 casadi::Opti FlywheelCasADi(units::second_t dt, int N) {
   // Flywheel model:
@@ -52,7 +55,113 @@ casadi::Opti FlywheelCasADi(units::second_t dt, int N) {
   return opti;
 }
 
-casadi::Opti CartpoleCasADi(units::second_t dt, int N) {
+casadi::MX CartPoleDynamics(const casadi::MX& x, const casadi::MX& u) {
+  // https://underactuated.mit.edu/acrobot.html#cart_pole
+  //
+  // q = [x, θ]ᵀ
+  // q̇ = [ẋ, θ̇]ᵀ
+  // u = f_x
+  //
+  // M(q)q̈ + C(q, q̇)q̇ = τ_g(q) + Bu
+  // M(q)q̈ = τ_g(q) − C(q, q̇)q̇ + Bu
+  // q̈ = M⁻¹(q)(τ_g(q) − C(q, q̇)q̇ + Bu)
+  //
+  //        [ m_c + m_p  m_p l cosθ]
+  // M(q) = [m_p l cosθ    m_p l²  ]
+  //
+  //           [0  −m_p lθ̇ sinθ]
+  // C(q, q̇) = [0       0      ]
+  //
+  //          [     0      ]
+  // τ_g(q) = [-m_p gl sinθ]
+  //
+  //     [1]
+  // B = [0]
+  constexpr double m_c = (5_kg).value();        // Cart mass
+  constexpr double m_p = (0.5_kg).value();      // Pole mass
+  constexpr double l = (0.5_m).value();         // Pole length
+  constexpr double g = (9.806_mps_sq).value();  // Acceleration due to gravity
+
+  auto q = x(casadi::Slice{0, 2});
+  auto qdot = x(casadi::Slice{2, 2});
+  auto theta = q(1);
+  auto thetadot = qdot(1);
+
+  //        [ m_c + m_p  m_p l cosθ]
+  // M(q) = [m_p l cosθ    m_p l²  ]
+  casadi::MX M{2, 2};
+  M(0, 0) = m_c + m_p;
+  M(0, 1) = m_p * l * cos(theta);  // NOLINT
+  M(1, 0) = m_p * l * cos(theta);  // NOLINT
+  M(1, 1) = m_p * std::pow(l, 2);
+
+  casadi::MX Minv{2, 2};
+  Minv(0, 0) = M(1, 1);
+  Minv(0, 1) = -M(0, 1);
+  Minv(1, 0) = -M(1, 0);
+  Minv(1, 1) = M(0, 0);
+  auto detM = M(0, 0) * M(1, 1) - M(0, 1) * M(1, 0);
+  Minv /= detM;
+
+  //           [0  −m_p lθ̇ sinθ]
+  // C(q, q̇) = [0       0      ]
+  casadi::MX C{2, 2};
+  C(0, 0) = 0;
+  C(0, 1) = -m_p * l * thetadot * sin(theta);  // NOLINT
+  C(1, 0) = 0;
+  C(1, 1) = 0;
+
+  //          [     0      ]
+  // τ_g(q) = [-m_p gl sinθ]
+  casadi::MX tau_g{2, 1};
+  tau_g(0) = 0;
+  tau_g(1) = -m_p * g * l * sin(theta);  // NOLINT
+
+  //     [1]
+  // B = [0]
+  casadi::MX B{2, 1};
+  B(0) = 1.0;
+  B(1) = 0.0;
+
+  // q̈ = M⁻¹(q)(τ_g(q) − C(q, q̇)q̇ + Bu)
+  return Minv * (tau_g - C * qdot + B * u);
+}
+
+casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
   casadi::Opti opti;
+  casadi::Slice all;
+
+  // x = [q, q̇]ᵀ = [x, θ, ẋ, θ̇]ᵀ
+  auto X = opti.variable(4, N + 1);
+
+  // u = f_x
+  auto U = opti.variable(1, N);
+
+  // Initial conditions
+  opti.set_initial(X(all, 0), 0.0);
+
+  // Final conditions
+  opti.set_initial(X(0, N + 1), 0.0);
+  opti.set_initial(X(1, N + 1), wpi::numbers::pi);
+  opti.set_initial(X(2, N + 1), 0.0);
+  opti.set_initial(X(3, N + 1), 0.0);
+
+  // Input constraints
+  for (int k = 0; k < N; ++k) {
+    opti.subject_to(U(all, k) >= -1.0);
+    opti.subject_to(U(all, k) <= 1.0);
+  }
+
+  // Dynamics constraints - RK4 integration
+  for (int k = 0; k < N; ++k) {
+    opti.subject_to(
+        X(all, k + 1) ==
+        frc::RK4<decltype(CartPoleDynamics), casadi::MX, casadi::MX>(
+            CartPoleDynamics, X(all, k), U(all, k), dt));
+  }
+
+  // Minimize sum squared inputs
+  opti.minimize(U.T() * U);
+
   return opti;
 }

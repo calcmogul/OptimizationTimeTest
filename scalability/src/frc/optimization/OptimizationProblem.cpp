@@ -2,7 +2,7 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "frc/optimization/Problem.h"
+#include "frc/optimization/OptimizationProblem.h"
 
 #include <array>
 #include <cassert>
@@ -122,13 +122,13 @@ double ToMilliseconds(const std::chrono::duration<Rep, Period>& duration) {
 }
 }  // namespace
 
-Problem::Problem() noexcept {
+OptimizationProblem::OptimizationProblem() noexcept {
   m_decisionVariables.reserve(1024);
   m_equalityConstraints.reserve(1024);
   m_inequalityConstraints.reserve(1024);
 }
 
-VariableMatrix Problem::DecisionVariable(int rows, int cols) {
+VariableMatrix OptimizationProblem::DecisionVariable(int rows, int cols) {
   VariableMatrix vars{rows, cols};
   int oldSize = m_decisionVariables.size();
 
@@ -144,31 +144,31 @@ VariableMatrix Problem::DecisionVariable(int rows, int cols) {
   return vars;
 }
 
-void Problem::Minimize(const VariableMatrix& cost) {
+void OptimizationProblem::Minimize(const VariableMatrix& cost) {
   assert(cost.Rows() == 1 && cost.Cols() == 1);
   m_f = cost.Autodiff(0, 0);
 }
 
-void Problem::Minimize(VariableMatrix&& cost) {
+void OptimizationProblem::Minimize(VariableMatrix&& cost) {
   assert(cost.Rows() == 1 && cost.Cols() == 1);
   m_f = std::move(cost.Autodiff(0, 0));
 }
 
-void Problem::Maximize(const VariableMatrix& objective) {
+void OptimizationProblem::Maximize(const VariableMatrix& objective) {
   assert(objective.Rows() == 1 && objective.Cols() == 1);
 
   // Maximizing an objective function is the same as minimizing its negative
   m_f = -objective.Autodiff(0, 0);
 }
 
-void Problem::Maximize(VariableMatrix&& objective) {
+void OptimizationProblem::Maximize(VariableMatrix&& objective) {
   assert(objective.Rows() == 1 && objective.Cols() == 1);
 
   // Maximizing an objective function is the same as minimizing its negative
   m_f = -std::move(objective.Autodiff(0, 0));
 }
 
-void Problem::SubjectTo(EqualityConstraints&& constraint) {
+void OptimizationProblem::SubjectTo(EqualityConstraints&& constraint) {
   auto& storage = constraint.constraints;
 
   m_equalityConstraints.reserve(m_equalityConstraints.size() + storage.size());
@@ -178,7 +178,7 @@ void Problem::SubjectTo(EqualityConstraints&& constraint) {
   }
 }
 
-void Problem::SubjectTo(InequalityConstraints&& constraint) {
+void OptimizationProblem::SubjectTo(InequalityConstraints&& constraint) {
   auto& storage = constraint.constraints;
 
   m_inequalityConstraints.reserve(m_inequalityConstraints.size() +
@@ -189,7 +189,7 @@ void Problem::SubjectTo(InequalityConstraints&& constraint) {
   }
 }
 
-SolverStatus Problem::Solve(const SolverConfig& config) {
+SolverStatus OptimizationProblem::Solve(const SolverConfig& config) {
   constexpr std::array<const char*, 5> kExprTypeToName = {
       "empty", "constant", "linear", "quadratic", "nonlinear"};
 
@@ -257,7 +257,7 @@ SolverStatus Problem::Solve(const SolverConfig& config) {
   return status;
 }
 
-Eigen::VectorXd Problem::InteriorPoint(
+Eigen::VectorXd OptimizationProblem::InteriorPoint(
     const Eigen::Ref<const Eigen::VectorXd>& initialGuess,
     SolverStatus* status) {
   // Let f(x)ₖ be the cost function, cₑ(x)ₖ be the equality constraints, and
@@ -579,8 +579,11 @@ Eigen::VectorXd Problem::InteriorPoint(
       fmt::print("Exit condition: ");
       if (status->exitCondition == SolverExitCondition::kOk) {
         fmt::print("optimal solution found");
-      } else if (status->exitCondition == SolverExitCondition::kInfeasible) {
-        fmt::print("problem is infeasible");
+      } else if (status->exitCondition == SolverExitCondition::kTooFewDOFs) {
+        fmt::print("problem has too few degrees of freedom");
+      } else if (status->exitCondition ==
+                 SolverExitCondition::kLocallyInfeasible) {
+        fmt::print("problem is locally infeasible");
       } else if (status->exitCondition == SolverExitCondition::kMaxIterations) {
         fmt::print("maximum iterations exceeded");
       } else if (status->exitCondition == SolverExitCondition::kTimeout) {
@@ -796,7 +799,23 @@ Eigen::VectorXd Problem::InteriorPoint(
       }
       S.setFromTriplets(triplets.begin(), triplets.end());
 
-      // Check for problem infeasibility. The problem is infeasible if
+      // Check for overconstrained problem
+      if (m_equalityConstraints.size() > m_decisionVariables.size()) {
+        fmt::print("The problem has too few degrees of freedom.\n");
+        fmt::print(
+            "Violated constraints (cₑ(x) = 0) in order of declaration:\n");
+        for (int row = 0; row < c_e.rows(); ++row) {
+          if (c_e(row) < 0.0) {
+            fmt::print("  {}/{}: {} = 0\n", row + 1, c_e.rows(), c_e(row));
+          }
+        }
+
+        status->exitCondition = SolverExitCondition::kTooFewDOFs;
+        return x;
+      }
+
+      // Check for problem local infeasibility. The problem is locally
+      // infeasible if
       //
       //   Aₑᵀcₑ → 0
       //   Aᵢᵀcᵢ⁺ → 0
@@ -812,7 +831,7 @@ Eigen::VectorXd Problem::InteriorPoint(
           (A_e.transpose() * c_e).norm() < 1e-6 && c_e.norm() > 1e-2) {
         if (m_config.diagnostics) {
           fmt::print(
-              "The problem is infeasible due to violated equality "
+              "The problem is locally infeasible due to violated equality "
               "constraints.\n");
           fmt::print(
               "Violated constraints (cₑ(x) = 0) in order of declaration:\n");
@@ -823,7 +842,7 @@ Eigen::VectorXd Problem::InteriorPoint(
           }
         }
 
-        status->exitCondition = SolverExitCondition::kInfeasible;
+        status->exitCondition = SolverExitCondition::kLocallyInfeasible;
         return x;
       }
       if (m_inequalityConstraints.size() > 0) {
@@ -843,7 +862,7 @@ Eigen::VectorXd Problem::InteriorPoint(
             }
           }
 
-          status->exitCondition = SolverExitCondition::kInfeasible;
+          status->exitCondition = SolverExitCondition::kLocallyInfeasible;
           return x;
         }
       }

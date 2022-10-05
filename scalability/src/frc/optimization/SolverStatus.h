@@ -10,8 +10,8 @@
 namespace frc {
 
 /**
- * Return value of Problem::Solve() containing the detected problem type and
- * solver's return status.
+ * Return value of OptimizationProblem::Solve() containing the cost function and
+ * constraint types and solver's exit condition.
  */
 struct SolverStatus {
   /// The cost function type detected by the solver.

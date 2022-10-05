@@ -57,14 +57,14 @@ subject to cₑ(x) = 0
  * First, we need to make decision variables for our state and input.
  * @code{.cpp}
  * #include <frc/EigenCore.h>
- * #include <frc/optimization/Problem.h>
+ * #include <frc/optimization/OptimizationProblem.h>
  * #include <units/time.h>
  *
  * constexpr auto T = 5_s;
  * constexpr auto dt = 5_ms;
  * constexpr int N = T / dt;
  *
- * frc::Problem problem;
+ * frc::OptimizationProblem problem;
  *
  * // 2x1 state vector with N + 1 timesteps (includes last state)
  * auto X = problem.DecisionVariable(2, N + 1);
@@ -145,10 +145,10 @@ subject to cₑ(x) = 0
  *
  * In retrospect, the solution here seems obvious: if you want to reach the
  * desired position in minimal time, you just apply max input to move toward it,
- * then stop applying input once you get there. Problems can get more complex
- * than this though. In fact, we can use this same framework to design optimal
- * trajectories for a drivetrain while satisfying dynamics constraints, avoiding
- * obstacles, and driving through points of interest.
+ * then stop applying input once you get there. OptimizationProblems can get
+ * more complex than this though. In fact, we can use this same framework to
+ * design optimal trajectories for a drivetrain while satisfying dynamics
+ * constraints, avoiding obstacles, and driving through points of interest.
  *
  * ## Optimizing the problem formulation
  *
@@ -199,12 +199,12 @@ subject to cₑ(x) = 0
  *
  * All other problems are nonlinear.
  */
-class WPILIB_DLLEXPORT Problem {
+class WPILIB_DLLEXPORT OptimizationProblem {
  public:
   /**
    * Construct the optimization problem.
    */
-  Problem() noexcept;
+  OptimizationProblem() noexcept;
 
   /**
    * Create a matrix of decision variables in the optimization problem.

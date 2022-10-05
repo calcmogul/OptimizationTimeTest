@@ -14,3 +14,11 @@
  * @param N Number of samples in the problem.
  */
 frc::OptimizationProblem FlywheelOptimizationProblem(units::second_t dt, int N);
+
+/**
+ * Creates a cartpole nonlinear optimization problem with OptimizationProblem.
+ *
+ * @param dt Timestep duration.
+ * @param N Number of samples in the problem.
+ */
+frc::OptimizationProblem CartpoleOptimizationProblem(units::second_t dt, int N);

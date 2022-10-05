@@ -49,18 +49,17 @@ void RunTest(std::ofstream& results, std::function<Problem()> setup,
 
 int main() {
   constexpr auto T = 5_s;
+  constexpr int kMaxPower = 4;
 
   std::ofstream results{"results.csv"};
   if (!results.is_open()) {
     return 1;
   }
 
-  results << "Flywheel samples,"
+  results << "Samples,"
           << "CasADi setup time (ms),CasADi solve time (ms),"
           << "Problem setup time (ms),Problem solve time (ms)\n";
   std::flush(results);
-
-  constexpr int kMaxPower = 4;
 
   std::vector<int> Ns;
   for (int power = 0; power < kMaxPower; ++power) {
@@ -71,8 +70,7 @@ int main() {
   }
   Ns.emplace_back(std::pow(10, kMaxPower));
 
-  fmt::print("Solving flywheel direct transcription from N = {} to N = {}.\n",
-             Ns.front(), Ns.back());
+  fmt::print("Solving from N = {} to N = {}.\n", Ns.front(), Ns.back());
   for (int N : Ns) {
     results << N << ",";
     std::flush(results);

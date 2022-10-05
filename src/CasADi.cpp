@@ -51,3 +51,8 @@ casadi::Opti FlywheelCasADi(units::second_t dt, int N) {
 
   return opti;
 }
+
+casadi::Opti CartpoleCasADi(units::second_t dt, int N) {
+  casadi::Opti opti;
+  return opti;
+}

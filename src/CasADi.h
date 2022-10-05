@@ -14,3 +14,11 @@
  * @param N Number of samples in the problem.
  */
 casadi::Opti FlywheelCasADi(units::second_t dt, int N);
+
+/**
+ * Creates a cartpole nonlinear optimization problem with CasADi.
+ *
+ * @param dt Timestep duration.
+ * @param N Number of samples in the problem.
+ */
+casadi::Opti CartpoleCasADi(units::second_t dt, int N);

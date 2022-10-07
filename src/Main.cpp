@@ -49,7 +49,7 @@ void RunTest(std::ofstream& results, std::function<Problem()> setup,
 
 int main() {
   constexpr auto T = 5_s;
-  constexpr int kMaxPower = 4;
+  constexpr int kMaxPower = 3;
 
   std::ofstream results{"results.csv"};
   if (!results.is_open()) {
@@ -62,7 +62,10 @@ int main() {
   std::flush(results);
 
   std::vector<int> Ns;
-  for (int power = 0; power < kMaxPower; ++power) {
+  for (int N = 2; N < 10; ++N) {
+    Ns.emplace_back(N);
+  }
+  for (int power = 1; power < kMaxPower; ++power) {
     for (int N = std::pow(10, power); N < std::pow(10, power + 1);
          N += std::pow(10, power)) {
       Ns.emplace_back(N);
@@ -79,8 +82,11 @@ int main() {
 
     fmt::print(stderr, "CasADi (N = {})...", N);
     RunTest<casadi::Opti>(
-        results, [=] { return FlywheelCasADi(dt, N); },
-        [](casadi::Opti& opti) { opti.solve(); });
+        results, [=] { return CartPoleCasADi(dt, N); },
+        [](casadi::Opti& opti) {
+          opti.solver("ipopt");
+          opti.solve();
+        });
     fmt::print(stderr, " done.\n");
 
     results << ",";
@@ -88,8 +94,12 @@ int main() {
 
     fmt::print(stderr, "Problem (N = {})...", N);
     RunTest<frc::OptimizationProblem>(
-        results, [=] { return FlywheelOptimizationProblem(dt, N); },
-        [](frc::OptimizationProblem& problem) { problem.Solve(); });
+        results, [=] { return CartPoleOptimizationProblem(dt, N); },
+        [](frc::OptimizationProblem& problem) {
+          frc::SolverConfig config;
+          config.diagnostics = true;
+          problem.Solve(config);
+        });
     fmt::print(stderr, " done.\n");
 
     results << "\n";

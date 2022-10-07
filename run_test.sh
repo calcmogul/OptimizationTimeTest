@@ -1,3 +1,3 @@
 #!/bin/bash
 
-make -j$(nproc) && ./build/OptimizationTimeTest
+clear && make -j$(nproc) && clear && ./build/OptimizationTimeTest

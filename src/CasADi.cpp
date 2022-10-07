@@ -73,7 +73,7 @@ casadi::MX CartPoleDynamics(const casadi::MX& x, const casadi::MX& u) {
   // C(q, q̇) = [0       0      ]
   //
   //          [     0      ]
-  // τ_g(q) = [-m_p gl sinθ]
+  // τ_g(q) = [−m_p gl sinθ]
   //
   //     [1]
   // B = [0]
@@ -83,7 +83,7 @@ casadi::MX CartPoleDynamics(const casadi::MX& x, const casadi::MX& u) {
   constexpr double g = (9.806_mps_sq).value();  // Acceleration due to gravity
 
   auto q = x(casadi::Slice{0, 2});
-  auto qdot = x(casadi::Slice{2, 2});
+  auto qdot = x(casadi::Slice{2, 4});
   auto theta = q(1);
   auto thetadot = qdot(1);
 
@@ -124,7 +124,11 @@ casadi::MX CartPoleDynamics(const casadi::MX& x, const casadi::MX& u) {
   B(1) = 0.0;
 
   // q̈ = M⁻¹(q)(τ_g(q) − C(q, q̇)q̇ + Bu)
-  return Minv * (tau_g - C * qdot + B * u);
+  casadi::MX qddot{4, 1};
+  qddot(casadi::Slice{0, 2}) = qdot;
+  qddot(casadi::Slice{2, 4}) =
+      mtimes(Minv, tau_g - mtimes(C, qdot) + mtimes(B, u));
+  return qddot;
 }
 
 casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
@@ -141,10 +145,10 @@ casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
   opti.set_initial(X(all, 0), 0.0);
 
   // Final conditions
-  opti.set_initial(X(0, N + 1), 0.0);
-  opti.set_initial(X(1, N + 1), wpi::numbers::pi);
-  opti.set_initial(X(2, N + 1), 0.0);
-  opti.set_initial(X(3, N + 1), 0.0);
+  opti.set_initial(X(0, N), 0.0);
+  opti.set_initial(X(1, N), wpi::numbers::pi);
+  opti.set_initial(X(2, N), 0.0);
+  opti.set_initial(X(3, N), 0.0);
 
   // Input constraints
   for (int k = 0; k < N; ++k) {
@@ -161,7 +165,11 @@ casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
   }
 
   // Minimize sum squared inputs
-  opti.minimize(U.T() * U);
+  casadi::MX J = 0.0;
+  for (int k = 0; k < N; ++k) {
+    J += U(all, k).T() * U(all, k);
+  }
+  opti.minimize(J);
 
   return opti;
 }

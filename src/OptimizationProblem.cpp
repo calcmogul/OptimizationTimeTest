@@ -123,7 +123,10 @@ frc::VariableMatrix CartPoleDynamics(const frc::VariableMatrix& x,
   frc::Matrixd<2, 1> B{{1}, {0}};
 
   // q̈ = M⁻¹(q)(τ_g(q) − C(q, q̇)q̇ + Bu)
-  return Minv * (tau_g - C * qdot + B * u);
+  frc::VariableMatrix qddot{4, 1};
+  qddot.Segment(0, 2) = qdot;
+  qddot.Segment(2, 2) = Minv * (tau_g - C * qdot + B * u);
+  return qddot;
 }
 
 frc::OptimizationProblem CartPoleOptimizationProblem(units::second_t dt,
@@ -140,7 +143,7 @@ frc::OptimizationProblem CartPoleOptimizationProblem(units::second_t dt,
   X.Col(0) = frc::Matrixd<4, 1>{0.0, 0.0, 0.0, 0.0};
 
   // Final conditions
-  X.Col(N + 1) = frc::Matrixd<4, 1>{0.0, wpi::numbers::pi, 0.0, 0.0};
+  X.Col(N) = frc::Matrixd<4, 1>{0.0, wpi::numbers::pi, 0.0, 0.0};
 
   // Input constraints
   for (int k = 0; k < N; ++k) {
@@ -157,7 +160,11 @@ frc::OptimizationProblem CartPoleOptimizationProblem(units::second_t dt,
   }
 
   // Minimize sum squared inputs
-  problem.Minimize(U.Transpose() * U);
+  frc::VariableMatrix J = 0.0;
+  for (int k = 0; k < N; ++k) {
+    J += U.Col(k).Transpose() * U.Col(k);
+  }
+  problem.Minimize(J);
 
   return problem;
 }

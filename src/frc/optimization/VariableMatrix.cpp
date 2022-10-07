@@ -90,12 +90,12 @@ const VariableBlock<const VariableMatrix> VariableMatrix::Block(
 }
 
 VariableBlock<VariableMatrix> VariableMatrix::Segment(int offset, int length) {
-  return Block(0, offset, 1, length);
+  return Block(offset, 0, length, 1);
 }
 
 const VariableBlock<const VariableMatrix> VariableMatrix::Segment(
     int offset, int length) const {
-  return Block(0, offset, 1, length);
+  return Block(offset, 0, length, 1);
 }
 
 VariableBlock<VariableMatrix> VariableMatrix::Row(int row) {

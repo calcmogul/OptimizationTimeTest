@@ -40,6 +40,12 @@ Expression::Expression(ExpressionType type, BinaryFuncDouble valueFunc,
 
 WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator*(
     double lhs, const wpi::IntrusiveSharedPtr<Expression>& rhs) {
+  if (lhs == 0.0) {
+    return nullptr;
+  } else if (lhs == 1.0) {
+    return rhs;
+  }
+
   return MakeConstant(lhs) * rhs;
 }
 
@@ -212,11 +218,19 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator+(
 }
 WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator-(
     double lhs, const wpi::IntrusiveSharedPtr<Expression>& rhs) {
+  if (lhs == 0.0) {
+    return -rhs;
+  }
+
   return MakeConstant(lhs) - rhs;
 }
 
 WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator-(
     const wpi::IntrusiveSharedPtr<Expression>& lhs, double rhs) {
+  if (rhs == 0.0) {
+    return lhs;
+  }
+
   return lhs - MakeConstant(rhs);
 }
 

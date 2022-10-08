@@ -16,9 +16,6 @@ namespace frc::autodiff {
 enum class ExpressionType { kNone, kConstant, kLinear, kQuadratic, kNonlinear };
 
 struct WPILIB_DLLEXPORT Expression {
-  using BinaryFuncType =
-      ExpressionType (*)(const wpi::IntrusiveSharedPtr<Expression>&,
-                         const wpi::IntrusiveSharedPtr<Expression>&);
   using BinaryFuncDouble = double (*)(double, double);
   using TrinaryFuncDouble = double (*)(double, double, double);
   using TrinaryFuncExpr = wpi::IntrusiveSharedPtr<Expression> (*)(
@@ -33,10 +30,7 @@ struct WPILIB_DLLEXPORT Expression {
   wpi::IntrusiveSharedPtr<Expression> adjointExpr;
 
   // Expression argument type
-  BinaryFuncType typeFunc = [](const wpi::IntrusiveSharedPtr<Expression>&,
-                               const wpi::IntrusiveSharedPtr<Expression>&) {
-    return ExpressionType::kLinear;
-  };
+  ExpressionType type = frc::autodiff::ExpressionType::kLinear;
 
   // Either nullary operator with no arguments, unary operator with one
   // argument, or binary operator with two arguments. This operator is
@@ -100,13 +94,13 @@ struct WPILIB_DLLEXPORT Expression {
   /**
    * Constructs an unary expression (an operator with one argument).
    *
-   * @param typeFunc Binary operator that produces the expression's type.
+   * @param type The expression's type.
    * @param valueFunc Unary operator that produces this expression's value.
    * @param lhsGradientValueFunc Gradient with respect to the operand.
    * @param lhsGradientFunc Gradient with respect to the operand.
    * @param lhs Unary operator's operand.
    */
-  Expression(BinaryFuncType typeFunc, BinaryFuncDouble valueFunc,
+  Expression(ExpressionType type, BinaryFuncDouble valueFunc,
              TrinaryFuncDouble lhsGradientValueFunc,
              TrinaryFuncExpr lhsGradientFunc,
              wpi::IntrusiveSharedPtr<Expression> lhs);
@@ -114,7 +108,7 @@ struct WPILIB_DLLEXPORT Expression {
   /**
    * Constructs a binary expression (an operator with two arguments).
    *
-   * @param typeFunc Binary operator that produces the expression's type.
+   * @param type The expression's type.
    * @param valueFunc Unary operator that produces this expression's value.
    * @param lhsGradientValueFunc Gradient with respect to the left operand.
    * @param rhsGradientValueFunc Gradient with respect to the right operand.
@@ -123,7 +117,7 @@ struct WPILIB_DLLEXPORT Expression {
    * @param lhs Binary operator's left operand.
    * @param rhs Binary operator's right operand.
    */
-  Expression(BinaryFuncType typeFunc, BinaryFuncDouble valueFunc,
+  Expression(ExpressionType type, BinaryFuncDouble valueFunc,
              TrinaryFuncDouble lhsGradientValueFunc,
              TrinaryFuncDouble rhsGradientValueFunc,
              TrinaryFuncExpr lhsGradientFunc, TrinaryFuncExpr rhsGradientFunc,
@@ -175,12 +169,6 @@ struct WPILIB_DLLEXPORT Expression {
 
   friend WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator+(
       const wpi::IntrusiveSharedPtr<Expression>& lhs);
-
-  /**
-   * Returns the type of this expression (constant, linear, quadratic, or
-   * nonlinear).
-   */
-  ExpressionType Type() const;
 
   /**
    * Update the value of this node based on the values of its dependent

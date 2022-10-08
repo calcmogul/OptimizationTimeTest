@@ -15,7 +15,7 @@ Eigen::SparseMatrix<double> Jacobian(Eigen::Ref<VectorXvar> variables,
                                      Eigen::Ref<VectorXvar> wrt) {
   Eigen::SparseMatrix<double> J{variables.rows(), wrt.rows()};
 
-  // Reserve triplet space for 1% sparsity
+  // Reserve triplet space for 99% sparsity
   std::vector<Eigen::Triplet<double>> triplets;
   triplets.reserve(variables.rows() * wrt.rows() / 100);
 

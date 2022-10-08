@@ -16,7 +16,7 @@ Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt)
     : m_variable{std::move(variable)},
       m_wrt{wrt},
       m_gradientTree{GenerateGradientTree(m_variable, m_wrt)} {
-  // Reserve triplet space for 1% sparsity
+  // Reserve triplet space for 99% sparsity
   m_triplets.reserve(m_wrt.rows() * m_wrt.rows() * 0.01);
 }
 

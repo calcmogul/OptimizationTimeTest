@@ -337,6 +337,10 @@ wpi::IntrusiveSharedPtr<Expression> MakeConstant(double x) {
 
 wpi::IntrusiveSharedPtr<Expression> abs(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -371,6 +375,10 @@ wpi::IntrusiveSharedPtr<Expression> abs(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> acos(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -393,6 +401,10 @@ wpi::IntrusiveSharedPtr<Expression> acos(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> asin(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -415,6 +427,10 @@ wpi::IntrusiveSharedPtr<Expression> asin(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> atan(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -438,6 +454,10 @@ wpi::IntrusiveSharedPtr<Expression> atan(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> atan2(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& y,
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr || y == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>& rhs) {
@@ -469,6 +489,10 @@ wpi::IntrusiveSharedPtr<Expression> atan2(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> cos(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -491,6 +515,10 @@ wpi::IntrusiveSharedPtr<Expression> cos(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> cosh(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -516,6 +544,10 @@ wpi::IntrusiveSharedPtr<Expression> erf(  // NOLINT
   static constexpr double sqrt_pi =
       1.7724538509055160272981674833411451872554456638435L;
 
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -538,6 +570,10 @@ wpi::IntrusiveSharedPtr<Expression> erf(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> exp(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -561,6 +597,10 @@ wpi::IntrusiveSharedPtr<Expression> exp(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> hypot(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x,
     const wpi::IntrusiveSharedPtr<Expression>& y) {
+  if (x == nullptr || y == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>& rhs) {
@@ -592,6 +632,10 @@ wpi::IntrusiveSharedPtr<Expression> hypot(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> log(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -613,6 +657,10 @@ wpi::IntrusiveSharedPtr<Expression> log(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> log10(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
   static constexpr double ln10 = 2.3025850929940456840179914546843L;
+
+  if (x == nullptr) {
+    return nullptr;
+  }
 
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
@@ -637,6 +685,10 @@ wpi::IntrusiveSharedPtr<Expression> log10(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> pow(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& base,
     const wpi::IntrusiveSharedPtr<Expression>& power) {
+  if (base == nullptr || power == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>& rhs) {
@@ -695,6 +747,10 @@ wpi::IntrusiveSharedPtr<Expression> pow(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> sin(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -717,6 +773,10 @@ wpi::IntrusiveSharedPtr<Expression> sin(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> sinh(
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -739,6 +799,10 @@ wpi::IntrusiveSharedPtr<Expression> sinh(
 
 wpi::IntrusiveSharedPtr<Expression> sqrt(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -761,6 +825,10 @@ wpi::IntrusiveSharedPtr<Expression> sqrt(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> tan(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {
@@ -783,6 +851,10 @@ wpi::IntrusiveSharedPtr<Expression> tan(  // NOLINT
 
 wpi::IntrusiveSharedPtr<Expression> tanh(
     const wpi::IntrusiveSharedPtr<Expression>& x) {
+  if (x == nullptr) {
+    return nullptr;
+  }
+
   return wpi::MakeIntrusiveShared<Expression>(
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>&) {

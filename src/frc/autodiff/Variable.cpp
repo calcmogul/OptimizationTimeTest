@@ -216,11 +216,17 @@ double Variable::Value() const {
 }
 
 ExpressionType Variable::Type() const {
-  return expr->Type();
+  if (expr == nullptr) {
+    return ExpressionType::kNone;
+  } else {
+    return expr->Type();
+  }
 }
 
 void Variable::Update() {
-  expr->Update();
+  if (expr != nullptr) {
+    expr->Update();
+  }
 }
 
 Variable abs(double x) {

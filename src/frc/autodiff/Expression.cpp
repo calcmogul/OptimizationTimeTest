@@ -7,6 +7,8 @@
 #include <cmath>
 #include <utility>
 
+#include <wpi/numbers>
+
 namespace frc::autodiff {
 
 Expression::Expression(double value, ExpressionType type)
@@ -366,7 +368,7 @@ wpi::IntrusiveSharedPtr<Expression> abs(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> acos(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
   if (x == nullptr) {
-    return nullptr;
+    return MakeConstant(wpi::numbers::pi / 2.0);
   }
 
   // Evaluate the expression's type
@@ -447,8 +449,10 @@ wpi::IntrusiveSharedPtr<Expression> atan(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> atan2(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& y,
     const wpi::IntrusiveSharedPtr<Expression>& x) {
-  if (x == nullptr || y == nullptr) {
+  if (y == nullptr) {
     return nullptr;
+  } else if (x == nullptr) {
+    return MakeConstant(wpi::numbers::pi / 2.0);
   }
 
   // Evaluate the expression's type
@@ -484,7 +488,7 @@ wpi::IntrusiveSharedPtr<Expression> atan2(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> cos(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
   if (x == nullptr) {
-    return nullptr;
+    return MakeConstant(1.0);
   }
 
   // Evaluate the expression's type
@@ -511,7 +515,7 @@ wpi::IntrusiveSharedPtr<Expression> cos(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> cosh(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
   if (x == nullptr) {
-    return nullptr;
+    return MakeConstant(1.0);
   }
 
   // Evaluate the expression's type
@@ -568,7 +572,7 @@ wpi::IntrusiveSharedPtr<Expression> erf(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> exp(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
   if (x == nullptr) {
-    return nullptr;
+    return MakeConstant(1.0);
   }
 
   // Evaluate the expression's type
@@ -595,38 +599,95 @@ wpi::IntrusiveSharedPtr<Expression> exp(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> hypot(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x,
     const wpi::IntrusiveSharedPtr<Expression>& y) {
-  if (x == nullptr || y == nullptr) {
+  if (x == nullptr && y == nullptr) {
     return nullptr;
   }
 
-  // Evaluate the expression's type
-  ExpressionType type;
-  if (x->type == ExpressionType::kConstant &&
-      y->type == ExpressionType::kConstant) {
-    type = ExpressionType::kConstant;
-  } else {
-    type = ExpressionType::kNonlinear;
-  }
+  if (x == nullptr && y != nullptr) {
+    // Evaluate the expression's type
+    ExpressionType type;
+    if (y->type == ExpressionType::kConstant) {
+      type = ExpressionType::kConstant;
+    } else {
+      type = ExpressionType::kNonlinear;
+    }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double y) { return std::hypot(x, y); },
-      [](double x, double y, double parentAdjoint) {
-        return parentAdjoint * x / std::hypot(x, y);
-      },
-      [](double x, double y, double parentAdjoint) {
-        return parentAdjoint * y / std::hypot(x, y);
-      },
-      [](const wpi::IntrusiveSharedPtr<Expression>& x,
-         const wpi::IntrusiveSharedPtr<Expression>& y,
-         const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
-        return parentAdjoint * x / autodiff::hypot(x, y);
-      },
-      [](const wpi::IntrusiveSharedPtr<Expression>& x,
-         const wpi::IntrusiveSharedPtr<Expression>& y,
-         const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
-        return parentAdjoint * y / autodiff::hypot(x, y);
-      },
-      x, y);
+    return wpi::MakeIntrusiveShared<Expression>(
+        type, [](double x, double y) { return std::hypot(x, y); },
+        [](double x, double y, double parentAdjoint) {
+          return parentAdjoint * x / std::hypot(x, y);
+        },
+        [](double x, double y, double parentAdjoint) {
+          return parentAdjoint * y / std::hypot(x, y);
+        },
+        [](const wpi::IntrusiveSharedPtr<Expression>& x,
+           const wpi::IntrusiveSharedPtr<Expression>& y,
+           const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
+          return parentAdjoint * x / autodiff::hypot(x, y);
+        },
+        [](const wpi::IntrusiveSharedPtr<Expression>& x,
+           const wpi::IntrusiveSharedPtr<Expression>& y,
+           const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
+          return parentAdjoint * y / autodiff::hypot(x, y);
+        },
+        MakeConstant(0.0), y);
+  } else if (x != nullptr && y == nullptr) {
+    // Evaluate the expression's type
+    ExpressionType type;
+    if (x->type == ExpressionType::kConstant) {
+      type = ExpressionType::kConstant;
+    } else {
+      type = ExpressionType::kNonlinear;
+    }
+
+    return wpi::MakeIntrusiveShared<Expression>(
+        type, [](double x, double y) { return std::hypot(x, y); },
+        [](double x, double y, double parentAdjoint) {
+          return parentAdjoint * x / std::hypot(x, y);
+        },
+        [](double x, double y, double parentAdjoint) {
+          return parentAdjoint * y / std::hypot(x, y);
+        },
+        [](const wpi::IntrusiveSharedPtr<Expression>& x,
+           const wpi::IntrusiveSharedPtr<Expression>& y,
+           const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
+          return parentAdjoint * x / autodiff::hypot(x, y);
+        },
+        [](const wpi::IntrusiveSharedPtr<Expression>& x,
+           const wpi::IntrusiveSharedPtr<Expression>& y,
+           const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
+          return parentAdjoint * y / autodiff::hypot(x, y);
+        },
+        x, MakeConstant(0.0));
+  } else {
+    // Evaluate the expression's type
+    ExpressionType type;
+    if (x->type == ExpressionType::kConstant) {
+      type = ExpressionType::kConstant;
+    } else {
+      type = ExpressionType::kNonlinear;
+    }
+
+    return wpi::MakeIntrusiveShared<Expression>(
+        type, [](double x, double y) { return std::hypot(x, y); },
+        [](double x, double y, double parentAdjoint) {
+          return parentAdjoint * x / std::hypot(x, y);
+        },
+        [](double x, double y, double parentAdjoint) {
+          return parentAdjoint * y / std::hypot(x, y);
+        },
+        [](const wpi::IntrusiveSharedPtr<Expression>& x,
+           const wpi::IntrusiveSharedPtr<Expression>& y,
+           const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
+          return parentAdjoint * x / autodiff::hypot(x, y);
+        },
+        [](const wpi::IntrusiveSharedPtr<Expression>& x,
+           const wpi::IntrusiveSharedPtr<Expression>& y,
+           const wpi::IntrusiveSharedPtr<Expression>& parentAdjoint) {
+          return parentAdjoint * y / autodiff::hypot(x, y);
+        },
+        x, y);
+  }
 }
 
 wpi::IntrusiveSharedPtr<Expression> log(  // NOLINT
@@ -686,8 +747,11 @@ wpi::IntrusiveSharedPtr<Expression> log10(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> pow(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& base,
     const wpi::IntrusiveSharedPtr<Expression>& power) {
-  if (base == nullptr || power == nullptr) {
+  if (base == nullptr) {
     return nullptr;
+  }
+  if (power == nullptr) {
+    return MakeConstant(1.0);
   }
 
   // Evaluate the expression's type

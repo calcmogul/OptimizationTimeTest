@@ -23,14 +23,9 @@ Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt)
 Eigen::SparseMatrix<double> Hessian::Calculate() {
   m_triplets.clear();
   for (int row = 0; row < m_gradientTree.rows(); ++row) {
-    if (m_gradientTree(row).expr == nullptr) {
-      continue;
-    }
-    Eigen::RowVectorXd g = Gradient(m_gradientTree(row), m_wrt).transpose();
-    for (int col = 0; col < g.cols(); ++col) {
-      if (g(col) != 0.0) {
-        m_triplets.emplace_back(row, col, g(col));
-      }
+    Eigen::SparseVector<double> g = Gradient(m_gradientTree(row), m_wrt);
+    for (decltype(g)::InnerIterator it{g}; it; ++it) {
+      m_triplets.emplace_back(row, it.index(), it.value());
     }
   }
 

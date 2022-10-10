@@ -90,7 +90,7 @@ ax1.grid(visible=True)
 ax1.plot(samples, casadi_setup_time, label="CasADi")
 plot_poly2_fit(ax1, samples, casadi_setup_time, color="blue")
 
-ax1.plot(samples, problem_setup_time, label="Problem")
+ax1.plot(samples, problem_setup_time, label="OptimizationProblem")
 plot_poly2_fit(ax1, samples, problem_setup_time, color="orange")
 
 ax1.legend()
@@ -103,7 +103,7 @@ ax2.grid(visible=True)
 ax2.plot(samples, casadi_solve_time, label="CasADi")
 plot_exp2_fit(ax2, samples, casadi_solve_time, color="blue", force_intercept=True)
 
-ax2.plot(samples, problem_solve_time, label="Problem")
+ax2.plot(samples, problem_solve_time, label="OptimizationProblem")
 plot_exp2_fit(ax2, samples, problem_solve_time, color="orange", force_intercept=True)
 
 ax2.legend()

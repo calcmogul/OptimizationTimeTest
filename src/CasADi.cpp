@@ -171,5 +171,8 @@ casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
   }
   opti.minimize(J);
 
+  opti.solver("ipopt", {{"print_time", 0}},
+              {{"print_level", 0}, {"sb", "yes"}});
+
   return opti;
 }

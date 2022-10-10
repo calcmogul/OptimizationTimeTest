@@ -83,10 +83,7 @@ int main() {
     fmt::print(stderr, "CasADi (N = {})...", N);
     RunTest<casadi::Opti>(
         results, [=] { return CartPoleCasADi(dt, N); },
-        [](casadi::Opti& opti) {
-          opti.solver("ipopt");
-          opti.solve();
-        });
+        [](casadi::Opti& opti) { opti.solve(); });
     fmt::print(stderr, " done.\n");
 
     results << ",";
@@ -95,11 +92,7 @@ int main() {
     fmt::print(stderr, "Problem (N = {})...", N);
     RunTest<frc::OptimizationProblem>(
         results, [=] { return CartPoleOptimizationProblem(dt, N); },
-        [](frc::OptimizationProblem& problem) {
-          frc::SolverConfig config;
-          config.diagnostics = true;
-          problem.Solve(config);
-        });
+        [](frc::OptimizationProblem& problem) { problem.Solve(); });
     fmt::print(stderr, " done.\n");
 
     results << "\n";

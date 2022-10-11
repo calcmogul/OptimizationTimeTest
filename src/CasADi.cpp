@@ -11,6 +11,8 @@
 #include <units/angle.h>
 #include <units/angular_acceleration.h>
 #include <units/angular_velocity.h>
+#include <units/force.h>
+#include <units/length.h>
 #include <units/voltage.h>
 #include <wpi/numbers>
 
@@ -135,26 +137,38 @@ casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
   casadi::Opti opti;
   casadi::Slice all;
 
+  constexpr auto u_max = 20_N;
+  constexpr auto d = 1_m;
+  constexpr auto d_max = 2_m;
+
   // x = [q, q̇]ᵀ = [x, θ, ẋ, θ̇]ᵀ
   auto X = opti.variable(4, N + 1);
+
+  // Initial guess
+  for (int k = 0; k < N; ++k) {
+    opti.set_initial(X(0, k), static_cast<double>(k) / N * d.value());
+    opti.set_initial(X(1, k), static_cast<double>(k) / N * wpi::numbers::pi);
+  }
 
   // u = f_x
   auto U = opti.variable(1, N);
 
   // Initial conditions
-  opti.set_initial(X(all, 0), 0.0);
+  opti.subject_to(X(all, 0) == 0.0);
 
   // Final conditions
-  opti.set_initial(X(0, N), 0.0);
-  opti.set_initial(X(1, N), wpi::numbers::pi);
-  opti.set_initial(X(2, N), 0.0);
-  opti.set_initial(X(3, N), 0.0);
+  opti.subject_to(X(0, N) == 1.0);
+  opti.subject_to(X(1, N) == wpi::numbers::pi);
+  opti.subject_to(X(2, N) == 0.0);
+  opti.subject_to(X(3, N) == 0.0);
+
+  // Cart position constraints
+  opti.subject_to(X(0, all) >= 0.0);
+  opti.subject_to(X(0, all) <= d_max.value());
 
   // Input constraints
-  for (int k = 0; k < N; ++k) {
-    opti.subject_to(U(all, k) >= -1.0);
-    opti.subject_to(U(all, k) <= 1.0);
-  }
+  opti.subject_to(U >= -u_max.value());
+  opti.subject_to(U <= u_max.value());
 
   // Dynamics constraints - RK4 integration
   for (int k = 0; k < N; ++k) {

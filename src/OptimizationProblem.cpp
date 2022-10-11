@@ -15,6 +15,8 @@
 #include <units/angle.h>
 #include <units/angular_acceleration.h>
 #include <units/angular_velocity.h>
+#include <units/force.h>
+#include <units/length.h>
 #include <units/mass.h>
 #include <units/voltage.h>
 #include <wpi/numbers>
@@ -78,8 +80,8 @@ frc::VariableMatrix CartPoleDynamics(const frc::VariableMatrix& x,
   //
   //     [1]
   // B = [0]
-  constexpr double m_c = (5_kg).value();        // Cart mass
-  constexpr double m_p = (0.5_kg).value();      // Pole mass
+  constexpr double m_c = (1_kg).value();        // Cart mass
+  constexpr double m_p = (0.3_kg).value();      // Pole mass
   constexpr double l = (0.5_m).value();         // Pole length
   constexpr double g = (9.806_mps_sq).value();  // Acceleration due to gravity
 
@@ -131,25 +133,38 @@ frc::VariableMatrix CartPoleDynamics(const frc::VariableMatrix& x,
 
 frc::OptimizationProblem CartPoleOptimizationProblem(units::second_t dt,
                                                      int N) {
+  constexpr auto u_max = 20_N;
+  constexpr auto d = 1_m;
+  constexpr auto d_max = 2_m;
+
   frc::OptimizationProblem problem;
 
   // x = [q, q̇]ᵀ = [x, θ, ẋ, θ̇]ᵀ
   auto X = problem.DecisionVariable(4, N + 1);
 
+  // Initial guess
+  for (int k = 0; k < N; ++k) {
+    X(0, k) = static_cast<double>(k) / N * d.value();
+    X(1, k) = static_cast<double>(k) / N * wpi::numbers::pi;
+  }
+
   // u = f_x
   auto U = problem.DecisionVariable(1, N);
 
   // Initial conditions
-  X.Col(0) = frc::Matrixd<4, 1>{0.0, 0.0, 0.0, 0.0};
+  problem.SubjectTo(X.Col(0) == frc::Matrixd<4, 1>{0.0, 0.0, 0.0, 0.0});
 
   // Final conditions
-  X.Col(N) = frc::Matrixd<4, 1>{0.0, wpi::numbers::pi, 0.0, 0.0};
+  problem.SubjectTo(X.Col(N) ==
+                    frc::Matrixd<4, 1>{d.value(), wpi::numbers::pi, 0.0, 0.0});
+
+  // Cart position constraints
+  problem.SubjectTo(X.Row(0) >= 0.0);
+  problem.SubjectTo(X.Row(0) <= d_max.value());
 
   // Input constraints
-  for (int k = 0; k < N; ++k) {
-    problem.SubjectTo(U.Col(k) >= -1.0);
-    problem.SubjectTo(U.Col(k) <= 1.0);
-  }
+  problem.SubjectTo(U >= -u_max.value());
+  problem.SubjectTo(U <= u_max.value());
 
   // Dynamics constraints - RK4 integration
   for (int k = 0; k < N; ++k) {

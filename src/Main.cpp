@@ -62,10 +62,7 @@ int main() {
   std::flush(results);
 
   std::vector<int> Ns;
-  for (int N = 2; N < 10; ++N) {
-    Ns.emplace_back(N);
-  }
-  for (int power = 1; power < kMaxPower; ++power) {
+  for (int power = 2; power < kMaxPower; ++power) {
     for (int N = std::pow(10, power); N < std::pow(10, power + 1);
          N += std::pow(10, power)) {
       Ns.emplace_back(N);

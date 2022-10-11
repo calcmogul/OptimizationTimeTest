@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import math
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
@@ -22,7 +24,7 @@ def plot_poly2_fit(ax, x, y, color):
     else:
         label += f" - {abs(c):.4g}"
 
-    resampled_x = np.arange(0, x[-1], 100)
+    resampled_x = np.arange(x[0], x[-1] + 100, 100)
     ax.plot(
         resampled_x,
         poly2(resampled_x, a, b, c),
@@ -47,7 +49,7 @@ def plot_exp2_fit(ax, x, y, color, force_intercept=False):
         else:
             label += f" - {abs(c):.4g}"
 
-        resampled_x = np.arange(0, x[-1], 100)
+        resampled_x = np.arange(x[0], x[-1] + 100, 100)
         ax.plot(
             resampled_x,
             exp2(resampled_x, a, b, c),
@@ -63,7 +65,7 @@ def plot_exp2_fit(ax, x, y, color, force_intercept=False):
         # Fit exponential y = c(2ᵇˣ − 1) to x-y data
         a, b = curve_fit(exp2, x, y, p0=(1, 1e-6))[0]
 
-        resampled_x = np.arange(0, x[-1], 100)
+        resampled_x = np.arange(x[0], x[-1] + 100, 100)
         ax.plot(
             resampled_x,
             exp2(resampled_x, a, b),
@@ -73,12 +75,25 @@ def plot_exp2_fit(ax, x, y, color, force_intercept=False):
         )
 
 
-data = np.genfromtxt("results.csv", delimiter=",", skip_header=1)
-samples = data[:, 0].T
-casadi_setup_time = data[:, 1].T
-casadi_solve_time = data[:, 2].T
-problem_setup_time = data[:, 3].T
-problem_solve_time = data[:, 4].T
+(
+    samples,
+    casadi_setup_time,
+    casadi_solve_time,
+    problem_setup_time,
+    problem_solve_time,
+) = np.genfromtxt("results.csv", delimiter=",", skip_header=1, unpack=True)
+
+if (
+    math.isnan(casadi_setup_time[-1])
+    or math.isnan(casadi_solve_time[-1])
+    or math.isnan(problem_setup_time[-1])
+    or math.isnan(problem_solve_time[-1])
+):
+    samples = samples[:-1]
+    casadi_setup_time = casadi_setup_time[:-1]
+    casadi_solve_time = casadi_solve_time[:-1]
+    problem_setup_time = problem_setup_time[:-1]
+    problem_solve_time = problem_solve_time[:-1]
 
 fig = plt.figure()
 

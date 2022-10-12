@@ -85,7 +85,14 @@ class WPILIB_DLLEXPORT VariableMatrix {
   template <int _Rows, int _Cols>
   VariableMatrix& operator=(
       const Eigen::Matrix<autodiff::Variable, _Rows, _Cols>& values) {
-    m_storage = values;
+    m_storage.clear();
+    m_storage.reserve(_Rows * _Cols);
+    for (size_t row = 0; row < _Rows; ++row) {
+      for (size_t col = 0; col < _Cols; ++col) {
+        m_storage.emplace_back(values(row, col));
+      }
+    }
+
     return *this;
   }
 
@@ -97,7 +104,7 @@ class WPILIB_DLLEXPORT VariableMatrix {
     m_storage.reserve(_Rows * _Cols);
     for (size_t row = 0; row < _Rows; ++row) {
       for (size_t col = 0; col < _Cols; ++col) {
-        m_storage.emplace_back(values(row, col));
+        m_storage.emplace_back(std::move(values(row, col)));
       }
     }
   }
@@ -105,7 +112,14 @@ class WPILIB_DLLEXPORT VariableMatrix {
   template <int _Rows, int _Cols>
   VariableMatrix& operator=(
       Eigen::Matrix<autodiff::Variable, _Rows, _Cols>&& values) {
-    m_storage = std::move(values);
+    m_storage.clear();
+    m_storage.reserve(_Rows * _Cols);
+    for (size_t row = 0; row < _Rows; ++row) {
+      for (size_t col = 0; col < _Cols; ++col) {
+        m_storage.emplace_back(std::move(values(row, col)));
+      }
+    }
+
     return *this;
   }
 

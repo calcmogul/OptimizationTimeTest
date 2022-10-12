@@ -12,7 +12,7 @@ VariableMatrix::VariableMatrix(int rows, int cols)
     : m_rows{rows}, m_cols{cols} {
   for (int row = 0; row < rows; ++row) {
     for (int col = 0; col < cols; ++col) {
-      m_storage.emplace_back(0.0);
+      m_storage.emplace_back();
     }
   }
 }

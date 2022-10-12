@@ -30,7 +30,7 @@ class WPILIB_DLLEXPORT Gradient {
    * @param variable Variable of which to compute the gradient.
    * @param wrt Variable with respect to which to compute the gradient.
    */
-  Gradient(Variable variable, Variable wrt);
+  Gradient(Variable variable, Variable wrt) noexcept;
 
   /**
    * Constructs a Gradient object.
@@ -38,12 +38,12 @@ class WPILIB_DLLEXPORT Gradient {
    * @param variable Variable of which to compute the gradient.
    * @param wrt Variables with respect to which to compute the gradient.
    */
-  Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt);
+  Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt) noexcept;
 
   /**
    * Calculates the gradient.
    */
-  Eigen::SparseVector<double> Calculate();
+  const Eigen::SparseVector<double>& Calculate();
 
   /**
    * Updates the value of the variable.

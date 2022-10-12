@@ -12,11 +12,10 @@
 
 using namespace frc::autodiff;
 
-Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt)
-    : m_gradientTree{GenerateGradientTree(variable, wrt)},
-      m_jacobian{m_gradientTree, wrt} {}
+Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt) noexcept
+    : m_jacobian{GenerateGradientTree(variable, wrt), wrt} {}
 
-Eigen::SparseMatrix<double> Hessian::Calculate() {
+const Eigen::SparseMatrix<double>& Hessian::Calculate() {
   return m_jacobian.Calculate();
 }
 

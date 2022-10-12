@@ -31,12 +31,12 @@ class WPILIB_DLLEXPORT Jacobian {
    * @param variables Variables of which to compute the Jacobian.
    * @param wrt Variables with respect to which to compute the Jacobian.
    */
-  Jacobian(Eigen::Ref<VectorXvar> variables, Eigen::Ref<VectorXvar> wrt);
+  Jacobian(VectorXvar variables, VectorXvar wrt) noexcept;
 
   /**
    * Calculates the Jacobian.
    */
-  Eigen::SparseMatrix<double> Calculate();
+  const Eigen::SparseMatrix<double>& Calculate();
 
   /**
    * Updates the values of the variables.

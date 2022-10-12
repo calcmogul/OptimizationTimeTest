@@ -12,18 +12,18 @@
 
 using namespace frc::autodiff;
 
-Jacobian::Jacobian(Eigen::Ref<VectorXvar> variables, Eigen::Ref<VectorXvar> wrt)
+Jacobian::Jacobian(VectorXvar variables, VectorXvar wrt) noexcept
     : m_J{variables.rows(), wrt.rows()} {
-  m_gradients.reserve(variables.rows());
-  for (int row = 0; row < variables.rows(); ++row) {
-    m_gradients.emplace_back(variables(row), wrt);
-  }
-
   // Get the highest order expression type
   for (const auto& variable : variables) {
     if (m_highestOrderType < variable.Type()) {
       m_highestOrderType = variable.Type();
     }
+  }
+
+  m_gradients.reserve(variables.rows());
+  for (int row = 0; row < variables.rows(); ++row) {
+    m_gradients.emplace_back(std::move(variables(row)), wrt);
   }
 
   // Reserve triplet space for 99% sparsity
@@ -40,7 +40,7 @@ Jacobian::Jacobian(Eigen::Ref<VectorXvar> variables, Eigen::Ref<VectorXvar> wrt)
   }
 }
 
-Eigen::SparseMatrix<double> Jacobian::Calculate() {
+const Eigen::SparseMatrix<double>& Jacobian::Calculate() {
   if (m_highestOrderType > ExpressionType::kLinear) {
     CalculateImpl();
   }
@@ -65,8 +65,8 @@ void Jacobian::CalculateImpl() {
 
   m_triplets.clear();
   for (size_t row = 0; row < m_gradients.size(); ++row) {
-    Eigen::SparseVector<double> g = m_gradients[row].Calculate();
-    for (decltype(g)::InnerIterator it{g}; it; ++it) {
+    const auto& g = m_gradients[row].Calculate();
+    for (Eigen::SparseVector<double>::InnerIterator it{g}; it; ++it) {
       m_triplets.emplace_back(row, it.index(), it.value());
     }
   }

@@ -10,10 +10,10 @@
 
 using namespace frc::autodiff;
 
-Gradient::Gradient(Variable variable, Variable wrt)
+Gradient::Gradient(Variable variable, Variable wrt) noexcept
     : Gradient{std::move(variable), MapVectorXvar{&wrt, 1}} {}
 
-Gradient::Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt)
+Gradient::Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt) noexcept
     : m_variable{std::move(variable)}, m_wrt{wrt}, m_g{m_wrt.rows()} {
   if (m_variable.Type() < ExpressionType::kLinear) {
     // If the expression is less than linear, the Jacobian is zero
@@ -26,7 +26,7 @@ Gradient::Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt)
   }
 }
 
-Eigen::SparseVector<double> Gradient::Calculate() {
+const Eigen::SparseVector<double>& Gradient::Calculate() {
   if (m_variable.Type() > ExpressionType::kLinear) {
     CalculateImpl();
   }

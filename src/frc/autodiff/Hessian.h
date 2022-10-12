@@ -29,12 +29,12 @@ class WPILIB_DLLEXPORT Hessian {
    * @param variable Variable of which to compute the gradient.
    * @param wrt Variables with respect to which to compute the gradient.
    */
-  Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt);
+  Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt) noexcept;
 
   /**
    * Calculates the Hessian.
    */
-  Eigen::SparseMatrix<double> Calculate();
+  const Eigen::SparseMatrix<double>& Calculate();
 
   /**
    * Updates the values of the gradient tree.
@@ -47,7 +47,6 @@ class WPILIB_DLLEXPORT Hessian {
   Profiler& GetProfiler();
 
  private:
-  VectorXvar m_gradientTree;
   Jacobian m_jacobian;
 
   /**

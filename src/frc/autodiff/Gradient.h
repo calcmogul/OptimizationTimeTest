@@ -4,28 +4,66 @@
 
 #pragma once
 
+#include <vector>
+
 #include <wpi/SymbolExports.h>
 
-#include "Eigen/Core"
+#include "Eigen/SparseCore"
+#include "frc/autodiff/Expression.h"
+#include "frc/autodiff/Profiler.h"
 #include "frc/autodiff/Variable.h"
 
 namespace frc::autodiff {
 
 /**
- * Returns gradient of a variable with respect to the given variable.
+ * This class calculates the Jacobian of a vector of variables with respect to a
+ * vector of variables.
  *
- * @param variable Variable of which to compute the gradient.
- * @param wrt Variable with respect to which to compute the gradient.
+ * The Jacobian is only recomputed if the variable expression is quadratic or
+ * higher order.
  */
-WPILIB_DLLEXPORT double Gradient(Variable variable, Variable& wrt);
+class WPILIB_DLLEXPORT Gradient {
+ public:
+  /**
+   * Constructs a Gradient object.
+   *
+   * @param variable Variable of which to compute the gradient.
+   * @param wrt Variable with respect to which to compute the gradient.
+   */
+  Gradient(Variable variable, Variable wrt);
 
-/**
- * Returns gradient of a variable with respect to the given variable.
- *
- * @param variable Variable of which to compute the gradient.
- * @param wrt Variables with respect to which to compute the gradient.
- */
-WPILIB_DLLEXPORT Eigen::SparseVector<double> Gradient(
-    Variable variable, Eigen::Ref<VectorXvar> wrt);
+  /**
+   * Constructs a Gradient object.
+   *
+   * @param variable Variable of which to compute the gradient.
+   * @param wrt Variables with respect to which to compute the gradient.
+   */
+  Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt);
+
+  /**
+   * Calculates the gradient.
+   */
+  Eigen::SparseVector<double> Calculate();
+
+  /**
+   * Updates the value of the variable.
+   */
+  void Update();
+
+  /**
+   * Returns the profiler.
+   */
+  Profiler& GetProfiler();
+
+ private:
+  Variable m_variable;
+  VectorXvar m_wrt;
+
+  Eigen::SparseVector<double> m_g;
+
+  Profiler m_profiler;
+
+  void CalculateImpl();
+};
 
 }  // namespace frc::autodiff

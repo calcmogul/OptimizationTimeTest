@@ -212,7 +212,7 @@ class WPILIB_DLLEXPORT OptimizationProblem {
    * @param rows Number of matrix rows.
    * @param cols Number of matrix columns.
    */
-  VariableMatrix DecisionVariable(int rows = 1, int cols = 1);
+  [[nodiscard]] VariableMatrix DecisionVariable(int rows = 1, int cols = 1);
 
   /**
    * Tells the solver to minimize the output of the given cost function.

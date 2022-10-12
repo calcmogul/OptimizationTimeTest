@@ -4,19 +4,22 @@
 
 #pragma once
 
-#include <vector>
-
 #include <wpi/SymbolExports.h>
 
 #include "Eigen/Core"
 #include "Eigen/SparseCore"
+#include "frc/autodiff/Jacobian.h"
+#include "frc/autodiff/Profiler.h"
 #include "frc/autodiff/Variable.h"
 
 namespace frc::autodiff {
 
 /**
- * This class caches the gradient tree of a variable with respect to a vector of
- * variables so subsequent Hessian calculations are faster.
+ * This class calculates the Hessian of a variable with respect to a vector of
+ * variables.
+ *
+ * The gradient tree is cached so subsequent Hessian calculations are faster,
+ * and the Hessian is only recomputed if the variable expression is nonlinear.
  */
 class WPILIB_DLLEXPORT Hessian {
  public:
@@ -29,22 +32,23 @@ class WPILIB_DLLEXPORT Hessian {
   Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt);
 
   /**
-   * Calculate the Hessian.
+   * Calculates the Hessian.
    */
   Eigen::SparseMatrix<double> Calculate();
 
   /**
-   * Update the values of the gradient tree.
+   * Updates the values of the gradient tree.
    */
   void Update();
 
+  /**
+   * Returns the profiler.
+   */
+  Profiler& GetProfiler();
+
  private:
-  Variable m_variable;
-  VectorXvar m_wrt;
-
   VectorXvar m_gradientTree;
-
-  std::vector<Eigen::Triplet<double>> m_triplets;
+  Jacobian m_jacobian;
 
   /**
    * Returns the given variable's gradient tree.
@@ -52,7 +56,8 @@ class WPILIB_DLLEXPORT Hessian {
    * @param variable Variable of which to compute the gradient.
    * @param wrt Variables with respect to which to compute the gradient.
    */
-  static VectorXvar GenerateGradientTree(Variable& variable, VectorXvar& wrt);
+  static VectorXvar GenerateGradientTree(Variable& variable,
+                                         Eigen::Ref<VectorXvar> wrt);
 };
 
 }  // namespace frc::autodiff

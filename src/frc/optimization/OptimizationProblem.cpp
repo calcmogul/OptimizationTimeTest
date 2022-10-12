@@ -405,6 +405,8 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
   //     Nonlinear Optimization", 2005.
   //     https://users.iems.northwestern.edu/~nocedal/PDFfiles/integrated.pdf
 
+  auto solveStartTime = std::chrono::system_clock::now();
+
   if (m_config.diagnostics) {
     fmt::print("Number of equality constraints: {}\n",
                m_equalityConstraints.size());
@@ -468,82 +470,48 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
 
   Eigen::VectorXd step = Eigen::VectorXd::Zero(x.rows());
 
-  autodiff::Hessian hessian{L, xAD};
-
   SetAD(xAD, x);
   L.Update();
-  hessian.Update();
+
+  autodiff::Gradient gradientF{m_f.value(), xAD};
+  autodiff::Hessian hessianL{L, xAD};
+  autodiff::Jacobian jacobianCe{c_eAD, xAD};
+  autodiff::Jacobian jacobianCi{c_iAD, xAD};
 
   // Error estimate E_μ
   double E_mu = std::numeric_limits<double>::infinity();
 
   // Gradient of f ∇f
-  Eigen::SparseVector<double> gradientF{xAD.rows()};
-  if (status->costFunctionType == autodiff::ExpressionType::kConstant) {
-    // If the cost function is constant, the gradient is zero.
-    gradientF.setZero();
-  } else if (status->costFunctionType == autodiff::ExpressionType::kLinear) {
-    // If the cost function is linear, initialize the gradient once here since
-    // it's constant. Otherwise, initialization is delayed until the loop below.
-    gradientF = autodiff::Gradient(m_f.value(), xAD);
-  }
+  Eigen::SparseVector<double> g = gradientF.Calculate();
 
   // Hessian of the Lagrangian H
   //
   // Hₖ = ∇²ₓₓL(x, s, y, z)ₖ
-  Eigen::SparseMatrix<double> H{xAD.rows(), xAD.rows()};
-  if (status->costFunctionType < autodiff::ExpressionType::kQuadratic &&
-      status->equalityConstraintType < autodiff::ExpressionType::kQuadratic &&
-      status->inequalityConstraintType < autodiff::ExpressionType::kQuadratic) {
-    // If the cost function and constraints are less than quadratic, the Hessian
-    // is zero.
-    H.setZero();
-  } else if (status->costFunctionType <= autodiff::ExpressionType::kQuadratic &&
-             status->equalityConstraintType <=
-                 autodiff::ExpressionType::kQuadratic &&
-             status->inequalityConstraintType <=
-                 autodiff::ExpressionType::kQuadratic) {
-    // The cost function or constraints are at least quadratic. If none are
-    // above quadratic, initialize the Hessian once here since it's constant.
-    // Otherwise, initialization is delayed until the loop below.
-    H = hessian.Calculate();
-  }
+  Eigen::SparseMatrix<double> H = hessianL.Calculate();
 
-  // Equality constraints cₑ and equality constraint Jacobian Aₑ
+  // Equality constraints cₑ
+  Eigen::VectorXd c_e{m_equalityConstraints.size()};
+
+  // Equality constraint Jacobian Aₑ
   //
   //         [∇ᵀcₑ₁(x)ₖ]
   // Aₑ(x) = [∇ᵀcₑ₂(x)ₖ]
   //         [    ⋮    ]
   //         [∇ᵀcₑₘ(x)ₖ]
-  Eigen::SparseMatrix<double> A_e(m_equalityConstraints.size(), xAD.rows());
-  if (status->equalityConstraintType < autodiff::ExpressionType::kLinear) {
-    // If the equality constraints are less than linear, the constraint Jacobian
-    // is zero.
-    A_e.setZero();
-  } else if (status->equalityConstraintType ==
-             autodiff::ExpressionType::kLinear) {
-    // If the equality constraints are linear, initialize Aₑ once here since
-    // it's constant. Otherwise, initialization is delayed until the loop below.
-    A_e = autodiff::Jacobian(c_eAD, xAD);
-  }
+  Eigen::SparseMatrix<double> A_e = jacobianCe.Calculate();
 
-  // Inequality constraints cᵢ and inequality constraint Jacobian Aᵢ
+  // Inequality constraints cᵢ
+  Eigen::VectorXd c_i{m_inequalityConstraints.size()};
+
+  // Inequality constraint Jacobian Aᵢ
   //
   //         [∇ᵀcᵢ₁(x)ₖ]
   // Aᵢ(x) = [∇ᵀcᵢ₂(x)ₖ]
   //         [    ⋮    ]
   //         [∇ᵀcᵢₘ(x)ₖ]
-  Eigen::SparseMatrix<double> A_i(m_inequalityConstraints.size(), xAD.rows());
-  if (status->inequalityConstraintType < autodiff::ExpressionType::kLinear) {
-    // If the inequality constraints are less than linear, the constraint
-    // Jacobian is zero.
-    A_i.setZero();
-  } else if (status->inequalityConstraintType ==
-             autodiff::ExpressionType::kLinear) {
-    // If the inequality constraints are linear, initialize Aᵢ once here since
-    // it's constant. Otherwise, initialization is delayed until the loop below.
-    A_i = autodiff::Jacobian(c_iAD, xAD);
-  }
+  Eigen::SparseMatrix<double> A_i = jacobianCi.Calculate();
+
+  auto iterationsStartTime = std::chrono::system_clock::now();
 
   if (m_config.diagnostics) {
     // Print number of nonzeros in Lagrangian Hessian and constraint Jacobians
@@ -575,29 +543,45 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
     fmt::print("Error tolerance: {}\n\n", m_config.tolerance);
   }
 
-  // Equality constraints cₑ
-  Eigen::VectorXd c_e{m_equalityConstraints.size()};
-
-  // Inequality constraints cᵢ
-  Eigen::VectorXd c_i{m_inequalityConstraints.size()};
-
   int iterations = 0;
-
-  auto outerStartTime = std::chrono::system_clock::now();
 
   wpi::scope_exit exit{[&] {
     if (m_config.diagnostics) {
-      auto outerEndTime = std::chrono::system_clock::now();
-      fmt::print("\nNumber of iterations: {}\n\n", iterations);
+      auto solveEndTime = std::chrono::system_clock::now();
 
-      fmt::print("Solve time: {} ms\n\n",
-                 ToMilliseconds(outerEndTime - outerStartTime));
+      fmt::print("\nSolve time: {} ms\n",
+                 ToMilliseconds(solveEndTime - solveStartTime));
+      fmt::print("  ↳ {} ms (IPM setup)\n",
+                 ToMilliseconds(iterationsStartTime - solveStartTime));
+      if (iterations > 0) {
+        fmt::print(
+            "  ↳ {} ms ({} IPM iterations; {} ms average)\n",
+            ToMilliseconds(solveEndTime - iterationsStartTime), iterations,
+            ToMilliseconds((solveEndTime - iterationsStartTime) / iterations));
+      }
+      fmt::print("\n");
+
+      fmt::print("autodiff  avg duration (ms)  evals\n");
+      fmt::print("==================================\n");
+      fmt::print("  ∇f(x)      {:>10}     {:>5}\n",
+                 gradientF.GetProfiler().AverageDuration(),
+                 gradientF.GetProfiler().Measurements());
+      fmt::print("  ∇²ₓₓL      {:>10}     {:>5}\n",
+                 hessianL.GetProfiler().AverageDuration(),
+                 hessianL.GetProfiler().Measurements());
+      fmt::print(" ∂cₑ/∂x      {:>10}     {:>5}\n",
+                 jacobianCe.GetProfiler().AverageDuration(),
+                 jacobianCe.GetProfiler().Measurements());
+      fmt::print(" ∂cᵢ/∂x      {:>10}     {:>5}\n",
+                 jacobianCi.GetProfiler().AverageDuration(),
+                 jacobianCi.GetProfiler().Measurements());
+      fmt::print("\n");
     }
   }};
 
   while (E_mu > m_config.tolerance) {
     while (E_mu > kappa_epsilon * mu) {
-      auto innerStartTime = std::chrono::system_clock::now();
+      auto innerIterStartTime = std::chrono::system_clock::now();
 
       //     [s₁ 0 ⋯ 0 ]
       // S = [0  ⋱   ⋮ ]
@@ -633,31 +617,20 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
       // Σ⁻¹ = SZ⁻¹
       Eigen::SparseMatrix<double> inverseSigma = S * inverseZ;
 
-      if (status->costFunctionType > autodiff::ExpressionType::kQuadratic ||
-          status->equalityConstraintType > autodiff::ExpressionType::kLinear ||
-          status->inequalityConstraintType >
-              autodiff::ExpressionType::kLinear) {
-        // Hₖ = ∇²ₓₓL(x, s, y, z)ₖ
-        hessian.Update();
-        H = hessian.Calculate();
-      }
+      // Hₖ = ∇²ₓₓL(x, s, y, z)ₖ
+      H = hessianL.Calculate();
 
-      if (status->equalityConstraintType > autodiff::ExpressionType::kLinear) {
-        //         [∇ᵀcₑ₁(x)ₖ]
-        // Aₑ(x) = [∇ᵀcₑ₂(x)ₖ]
-        //         [    ⋮    ]
-        //         [∇ᵀcₑₘ(x)ₖ]
-        A_e = autodiff::Jacobian(c_eAD, xAD);
-      }
+      //         [∇ᵀcₑ₁(x)ₖ]
+      // Aₑ(x) = [∇ᵀcₑ₂(x)ₖ]
+      //         [    ⋮    ]
+      //         [∇ᵀcₑₘ(x)ₖ]
+      A_e = jacobianCe.Calculate();
 
-      if (status->inequalityConstraintType >
-          autodiff::ExpressionType::kLinear) {
-        //         [∇ᵀcᵢ₁(x)ₖ]
-        // Aᵢ(x) = [∇ᵀcᵢ₂(x)ₖ]
-        //         [    ⋮    ]
-        //         [∇ᵀcᵢₘ(x)ₖ]
-        A_i = autodiff::Jacobian(c_iAD, xAD);
-      }
+      //         [∇ᵀcᵢ₁(x)ₖ]
+      // Aᵢ(x) = [∇ᵀcᵢ₂(x)ₖ]
+      //         [    ⋮    ]
+      //         [∇ᵀcᵢₘ(x)ₖ]
+      A_i = jacobianCi.Calculate();
 
       // Update cₑ and cᵢ
       for (size_t row = 0; row < m_equalityConstraints.size(); row++) {
@@ -687,16 +660,14 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
                                       H.cols() + A_e.rows()};
       lhs.setFromTriplets(triplets.begin(), triplets.end());
 
-      if (status->costFunctionType > autodiff::ExpressionType::kLinear) {
-        gradientF = autodiff::Gradient(m_f.value(), xAD);
-      }
+      g = gradientF.Calculate();
 
       // rhs = −[∇f − Aₑᵀy + Aᵢᵀ(Σcᵢ − μS⁻¹e − z)]
       //        [               cₑ               ]
       //
       // The outer negative sign is applied in the solve() call.
       Eigen::VectorXd rhs{x.rows() + y.rows()};
-      rhs.topRows(x.rows()) = gradientF;
+      rhs.topRows(x.rows()) = g;
       if (m_equalityConstraints.size() > 0) {
         rhs.topRows(x.rows()) -= A_e.transpose() * y;
       }
@@ -779,16 +750,9 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
           s_max;
 
       // Update variables needed in error estimate
-      if (status->costFunctionType > autodiff::ExpressionType::kLinear) {
-        gradientF = autodiff::Gradient(m_f.value(), xAD);
-      }
-      if (status->equalityConstraintType > autodiff::ExpressionType::kLinear) {
-        A_e = autodiff::Jacobian(c_eAD, xAD);
-      }
-      if (status->inequalityConstraintType >
-          autodiff::ExpressionType::kLinear) {
-        A_i = autodiff::Jacobian(c_iAD, xAD);
-      }
+      g = gradientF.Calculate();
+      A_e = jacobianCe.Calculate();
+      A_i = jacobianCi.Calculate();
       for (size_t row = 0; row < m_equalityConstraints.size(); row++) {
         c_e[row] = m_equalityConstraints[row].Value();
       }
@@ -884,7 +848,7 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
       //   ||Sz − μe||_∞ / s_c
       //   ||cₑ||_∞
       //   ||cᵢ − s||_∞
-      Eigen::VectorXd eq1 = gradientF;
+      Eigen::VectorXd eq1 = g;
       if (m_equalityConstraints.size() > 0) {
         eq1 -= A_e.transpose() * y;
       }
@@ -900,7 +864,7 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
         E_mu = std::max(E_mu, (c_i - s).lpNorm<Eigen::Infinity>());
       }
 
-      auto innerEndTime = std::chrono::system_clock::now();
+      auto innerIterEndTime = std::chrono::system_clock::now();
 
       if (m_config.diagnostics) {
         if (iterations % 20 == 0) {
@@ -908,7 +872,7 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
           fmt::print("==============================\n");
         }
         fmt::print("{:>4}  {:>10}     {:>9.3e}\n", iterations,
-                   ToMilliseconds(innerEndTime - innerStartTime), E_mu);
+                   ToMilliseconds(innerIterEndTime - innerIterStartTime), E_mu);
       }
 
       ++iterations;
@@ -917,7 +881,8 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
         return x;
       }
 
-      if (units::second_t{innerEndTime - outerStartTime} > m_config.timeout) {
+      if (units::second_t{innerIterEndTime - solveStartTime} >
+          m_config.timeout) {
         status->exitCondition = SolverExitCondition::kTimeout;
         return x;
       }

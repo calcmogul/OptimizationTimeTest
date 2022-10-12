@@ -4,20 +4,63 @@
 
 #pragma once
 
+#include <vector>
+
 #include <wpi/SymbolExports.h>
 
 #include "Eigen/SparseCore"
+#include "frc/autodiff/Expression.h"
+#include "frc/autodiff/Gradient.h"
+#include "frc/autodiff/Profiler.h"
 #include "frc/autodiff/Variable.h"
 
 namespace frc::autodiff {
 
 /**
- * Returns the Jacobian of an autodiff vector with respect to the given vector.
+ * This class calculates the Jacobian of a vector of variables with respect to a
+ * vector of variables.
  *
- * @param variables Vector of which to compute the Jacobian.
- * @param wrt Vector with respect to which to compute the Jacobian.
+ * The Jacobian is only recomputed if the variable expression is quadratic or
+ * higher order.
  */
-WPILIB_DLLEXPORT Eigen::SparseMatrix<double> Jacobian(
-    Eigen::Ref<VectorXvar> variables, Eigen::Ref<VectorXvar> wrt);
+class WPILIB_DLLEXPORT Jacobian {
+ public:
+  /**
+   * Constructs a Jacobian object.
+   *
+   * @param variables Variables of which to compute the Jacobian.
+   * @param wrt Variables with respect to which to compute the Jacobian.
+   */
+  Jacobian(Eigen::Ref<VectorXvar> variables, Eigen::Ref<VectorXvar> wrt);
+
+  /**
+   * Calculates the Jacobian.
+   */
+  Eigen::SparseMatrix<double> Calculate();
+
+  /**
+   * Updates the values of the variables.
+   */
+  void Update();
+
+  /**
+   * Returns the profiler.
+   */
+  Profiler& GetProfiler();
+
+ private:
+  std::vector<Gradient> m_gradients;
+
+  // The highest order expression type in m_variables
+  ExpressionType m_highestOrderType = ExpressionType::kNone;
+
+  std::vector<Eigen::Triplet<double>> m_triplets;
+
+  Eigen::SparseMatrix<double> m_J;
+
+  Profiler m_profiler;
+
+  void CalculateImpl();
+};
 
 }  // namespace frc::autodiff

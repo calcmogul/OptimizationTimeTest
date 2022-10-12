@@ -5,61 +5,58 @@
 #include "frc/autodiff/Gradient.h"
 
 #include <tuple>
-#include <vector>
 
-namespace frc::autodiff {
+#include <wpi/IntrusiveSharedPtr.h>
 
-double Gradient(Variable variable, Variable& wrt) {
-  // Read wpimath/README.md#Reverse_accumulation_automatic_differentiation for
-  // background on reverse accumulation automatic differentiation.
+using namespace frc::autodiff;
 
-  wrt.expr->adjoint = 0.0;
+Gradient::Gradient(Variable variable, Variable wrt)
+    : Gradient{std::move(variable), MapVectorXvar{&wrt, 1}} {}
 
-  // Stack element contains variable and its adjoint
-  std::vector<std::tuple<Variable, double>> stack;
-  stack.reserve(1024);
-
-  stack.emplace_back(variable, 1.0);
-  while (!stack.empty()) {
-    Variable var = std::move(std::get<0>(stack.back()));
-    double adjoint = std::move(std::get<1>(stack.back()));
-    stack.pop_back();
-
-    auto& lhs = var.expr->args[0];
-    auto& rhs = var.expr->args[1];
-
-    var.expr->adjoint += adjoint;
-
-    if (lhs != nullptr) {
-      if (rhs == nullptr) {
-        stack.emplace_back(
-            lhs, var.expr->gradientValueFuncs[0](lhs->value, 0.0, adjoint));
-      } else {
-        stack.emplace_back(lhs, var.expr->gradientValueFuncs[0](
-                                    lhs->value, rhs->value, adjoint));
-        stack.emplace_back(rhs, var.expr->gradientValueFuncs[1](
-                                    lhs->value, rhs->value, adjoint));
-      }
-    }
+Gradient::Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt)
+    : m_variable{std::move(variable)}, m_wrt{wrt}, m_g{m_wrt.rows()} {
+  if (m_variable.Type() < ExpressionType::kLinear) {
+    // If the expression is less than linear, the Jacobian is zero
+    m_profiler.Start();
+    m_g.setZero();
+    m_profiler.Stop();
+  } else if (m_variable.Type() == ExpressionType::kLinear) {
+    // If the expression is linear, compute it once since it's constant
+    CalculateImpl();
   }
-
-  return wrt.expr->adjoint;
 }
 
-Eigen::SparseVector<double> Gradient(Variable variable,
-                                     Eigen::Ref<VectorXvar> wrt) {
+Eigen::SparseVector<double> Gradient::Calculate() {
+  if (m_variable.Type() > ExpressionType::kLinear) {
+    CalculateImpl();
+  }
+
+  return m_g;
+}
+
+void Gradient::Update() {
+  m_variable.Update();
+}
+
+Profiler& Gradient::GetProfiler() {
+  return m_profiler;
+}
+
+void Gradient::CalculateImpl() {
   // Read wpimath/README.md#Reverse_accumulation_automatic_differentiation for
   // background on reverse accumulation automatic differentiation.
 
-  for (int row = 0; row < wrt.rows(); ++row) {
-    wrt(row).expr->adjoint = 0.0;
+  m_profiler.Start();
+
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    m_wrt(row).expr->adjoint = 0.0;
   }
 
   // Stack element contains variable and its adjoint
   std::vector<std::tuple<Variable, double>> stack;
   stack.reserve(1024);
 
-  stack.emplace_back(variable, 1.0);
+  stack.emplace_back(m_variable, 1.0);
   while (!stack.empty()) {
     Variable var = std::move(std::get<0>(stack.back()));
     double adjoint = std::move(std::get<1>(stack.back()));
@@ -83,15 +80,13 @@ Eigen::SparseVector<double> Gradient(Variable variable,
     }
   }
 
-  Eigen::SparseVector<double> grad{wrt.rows()};
-  for (int row = 0; row < wrt.rows(); ++row) {
-    double adjoint = wrt(row).expr->adjoint;
+  m_g.setZero();
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    double adjoint = m_wrt(row).expr->adjoint;
     if (adjoint != 0.0) {
-      grad.insertBack(row) = adjoint;
+      m_g.insertBack(row) = adjoint;
     }
   }
 
-  return grad;
+  m_profiler.Stop();
 }
-
-}  // namespace frc::autodiff

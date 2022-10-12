@@ -662,7 +662,8 @@ wpi::IntrusiveSharedPtr<Expression> hypot(  // NOLINT
   } else {
     // Evaluate the expression's type
     ExpressionType type;
-    if (x->type == ExpressionType::kConstant) {
+    if (x->type == ExpressionType::kConstant &&
+        y->type == ExpressionType::kConstant) {
       type = ExpressionType::kConstant;
     } else {
       type = ExpressionType::kNonlinear;

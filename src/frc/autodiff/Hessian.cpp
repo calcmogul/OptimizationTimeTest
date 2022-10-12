@@ -13,29 +13,23 @@
 using namespace frc::autodiff;
 
 Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt)
-    : m_variable{std::move(variable)},
-      m_wrt{wrt},
-      m_gradientTree{GenerateGradientTree(m_variable, m_wrt)} {
-  // Reserve triplet space for 99% sparsity
-  m_triplets.reserve(m_wrt.rows() * m_wrt.rows() * 0.01);
-}
+    : m_gradientTree{GenerateGradientTree(variable, wrt)},
+      m_jacobian{m_gradientTree, wrt} {}
 
 Eigen::SparseMatrix<double> Hessian::Calculate() {
-  m_triplets.clear();
-  for (int row = 0; row < m_gradientTree.rows(); ++row) {
-    Eigen::SparseVector<double> g = Gradient(m_gradientTree(row), m_wrt);
-    for (decltype(g)::InnerIterator it{g}; it; ++it) {
-      m_triplets.emplace_back(row, it.index(), it.value());
-    }
-  }
-
-  Eigen::SparseMatrix<double> H{m_wrt.rows(), m_wrt.rows()};
-  H.setFromTriplets(m_triplets.begin(), m_triplets.end());
-
-  return H;
+  return m_jacobian.Calculate();
 }
 
-VectorXvar Hessian::GenerateGradientTree(Variable& variable, VectorXvar& wrt) {
+void Hessian::Update() {
+  m_jacobian.Update();
+}
+
+Profiler& Hessian::GetProfiler() {
+  return m_jacobian.GetProfiler();
+}
+
+VectorXvar Hessian::GenerateGradientTree(Variable& variable,
+                                         Eigen::Ref<VectorXvar> wrt) {
   // Read wpimath/README.md#Reverse_accumulation_automatic_differentiation for
   // background on reverse accumulation automatic differentiation.
 
@@ -48,7 +42,8 @@ VectorXvar Hessian::GenerateGradientTree(Variable& variable, VectorXvar& wrt) {
   std::vector<std::tuple<Variable, wpi::IntrusiveSharedPtr<Expression>>> stack;
   stack.reserve(1024);
 
-  stack.emplace_back(variable, wpi::MakeIntrusiveShared<Expression>(1.0));
+  stack.emplace_back(variable, wpi::MakeIntrusiveShared<Expression>(
+                                   1.0, ExpressionType::kConstant));
   while (!stack.empty()) {
     Variable var = std::move(std::get<0>(stack.back()));
     wpi::IntrusiveSharedPtr<Expression> adjoint =
@@ -104,10 +99,4 @@ VectorXvar Hessian::GenerateGradientTree(Variable& variable, VectorXvar& wrt) {
   }
 
   return grad;
-}
-
-void Hessian::Update() {
-  for (int row = 0; row < m_gradientTree.rows(); ++row) {
-    m_gradientTree(row).Update();
-  }
 }

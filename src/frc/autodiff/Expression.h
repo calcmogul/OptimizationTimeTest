@@ -25,9 +25,7 @@ struct WPILIB_DLLEXPORT Expression {
 
   double value = 0.0;
 
-  double adjoint = 0.0;
-
-  wpi::IntrusiveSharedPtr<Expression> adjointExpr;
+  int row = -1;
 
   // Expression argument type
   ExpressionType type = frc::autodiff::ExpressionType::kLinear;

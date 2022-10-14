@@ -5,6 +5,7 @@
 #include "frc/autodiff/Jacobian.h"
 
 #include <tuple>
+#include <unordered_map>
 
 #include <wpi/IntrusiveSharedPtr.h>
 
@@ -13,21 +14,18 @@
 using namespace frc::autodiff;
 
 Jacobian::Jacobian(VectorXvar variables, VectorXvar wrt) noexcept
-    : m_J{variables.rows(), wrt.rows()} {
+    : m_variables{std::move(variables)},
+      m_wrt{std::move(wrt)},
+      m_J{m_variables.rows(), m_wrt.rows()} {
   // Get the highest order expression type
-  for (const auto& variable : variables) {
+  for (const auto& variable : m_variables) {
     if (m_highestOrderType < variable.Type()) {
       m_highestOrderType = variable.Type();
     }
   }
 
-  m_gradients.reserve(variables.rows());
-  for (int row = 0; row < variables.rows(); ++row) {
-    m_gradients.emplace_back(std::move(variables(row)), wrt);
-  }
-
   // Reserve triplet space for 99% sparsity
-  m_triplets.reserve(variables.rows() * wrt.rows() * 0.01);
+  m_triplets.reserve(m_variables.rows() * m_wrt.rows() * 0.01);
 
   if (m_highestOrderType < ExpressionType::kLinear) {
     // If the expression is less than linear, the Jacobian is zero
@@ -49,8 +47,8 @@ const Eigen::SparseMatrix<double>& Jacobian::Calculate() {
 }
 
 void Jacobian::Update() {
-  for (auto& gradient : m_gradients) {
-    gradient.Update();
+  for (int row = 0; row < m_variables.rows(); ++row) {
+    m_variables(row).Update();
   }
 }
 
@@ -64,11 +62,56 @@ void Jacobian::CalculateImpl() {
   Update();
 
   m_triplets.clear();
-  for (size_t row = 0; row < m_gradients.size(); ++row) {
-    const auto& g = m_gradients[row].Calculate();
-    for (Eigen::SparseVector<double>::InnerIterator it{g}; it; ++it) {
-      m_triplets.emplace_back(row, it.index(), it.value());
+
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    m_wrt(row).expr->row = row;
+  }
+
+  std::unordered_map<int, double> adjoints;
+
+  // Stack element contains variable and its adjoint
+  std::vector<std::tuple<Variable, double>> stack;
+  stack.reserve(1024);
+
+  for (int row = 0; row < m_variables.rows(); ++row) {
+    adjoints.clear();
+
+    stack.emplace_back(m_variables(row), 1.0);
+    while (!stack.empty()) {
+      Variable var = std::move(std::get<0>(stack.back()));
+      double adjoint = std::move(std::get<1>(stack.back()));
+      stack.pop_back();
+
+      auto& lhs = var.expr->args[0];
+      auto& rhs = var.expr->args[1];
+
+      // The row is turned into a column to transpose the Jacobian
+      int col = var.expr->row;
+
+      if (lhs != nullptr) {
+        if (rhs == nullptr) {
+          stack.emplace_back(
+              lhs, var.expr->gradientValueFuncs[0](lhs->value, 0.0, adjoint));
+        } else {
+          stack.emplace_back(lhs, var.expr->gradientValueFuncs[0](
+                                      lhs->value, rhs->value, adjoint));
+          stack.emplace_back(rhs, var.expr->gradientValueFuncs[1](
+                                      lhs->value, rhs->value, adjoint));
+        }
+      }
+
+      if (col != -1) {
+        adjoints[col] += adjoint;
+      }
     }
+
+    for (const auto& [col, adjoint] : adjoints) {
+      m_triplets.emplace_back(row, col, adjoint);
+    }
+  }
+
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    m_wrt(row).expr->row = -1;
   }
 
   m_J.setFromTriplets(m_triplets.begin(), m_triplets.end());

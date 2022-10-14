@@ -4,11 +4,12 @@
 
 #pragma once
 
+#include <vector>
+
 #include <wpi/SymbolExports.h>
 
 #include "Eigen/Core"
 #include "Eigen/SparseCore"
-#include "frc/autodiff/Jacobian.h"
 #include "frc/autodiff/Profiler.h"
 #include "frc/autodiff/Variable.h"
 
@@ -47,7 +48,19 @@ class WPILIB_DLLEXPORT Hessian {
   Profiler& GetProfiler();
 
  private:
-  Jacobian m_jacobian;
+  VectorXvar m_variables;
+  VectorXvar m_wrt;
+
+  // The highest order expression type in m_variables
+  ExpressionType m_highestOrderType = ExpressionType::kNone;
+
+  std::vector<Eigen::Triplet<double>> m_triplets;
+
+  Eigen::SparseMatrix<double> m_H;
+
+  Profiler m_profiler;
+
+  void CalculateImpl();
 
   /**
    * Returns the given variable's gradient tree.

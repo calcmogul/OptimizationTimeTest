@@ -10,7 +10,6 @@
 
 #include "Eigen/SparseCore"
 #include "frc/autodiff/Expression.h"
-#include "frc/autodiff/Gradient.h"
 #include "frc/autodiff/Profiler.h"
 #include "frc/autodiff/Variable.h"
 
@@ -49,7 +48,8 @@ class WPILIB_DLLEXPORT Jacobian {
   Profiler& GetProfiler();
 
  private:
-  std::vector<Gradient> m_gradients;
+  VectorXvar m_variables;
+  VectorXvar m_wrt;
 
   // The highest order expression type in m_variables
   ExpressionType m_highestOrderType = ExpressionType::kNone;

@@ -9,7 +9,6 @@ cppSrcFileInclude {
 }
 
 modifiableFileExclude {
-  src/frc/
   src/wpi/
   units/
   gradlew

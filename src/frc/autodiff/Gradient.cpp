@@ -5,6 +5,7 @@
 #include "frc/autodiff/Gradient.h"
 
 #include <tuple>
+#include <unordered_map>
 
 #include <wpi/IntrusiveSharedPtr.h>
 
@@ -49,8 +50,10 @@ void Gradient::CalculateImpl() {
   m_profiler.Start();
 
   for (int row = 0; row < m_wrt.rows(); ++row) {
-    m_wrt(row).expr->adjoint = 0.0;
+    m_wrt(row).expr->row = row;
   }
+
+  std::unordered_map<int, double> adjoints;
 
   // Stack element contains variable and its adjoint
   std::vector<std::tuple<Variable, double>> stack;
@@ -65,7 +68,7 @@ void Gradient::CalculateImpl() {
     auto& lhs = var.expr->args[0];
     auto& rhs = var.expr->args[1];
 
-    var.expr->adjoint += adjoint;
+    int row = var.expr->row;
 
     if (lhs != nullptr) {
       if (rhs == nullptr) {
@@ -78,11 +81,18 @@ void Gradient::CalculateImpl() {
                                     lhs->value, rhs->value, adjoint));
       }
     }
+
+    if (row != -1) {
+      adjoints[row] += adjoint;
+    }
+  }
+
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    m_wrt(row).expr->row = -1;
   }
 
   m_g.setZero();
-  for (int row = 0; row < m_wrt.rows(); ++row) {
-    double adjoint = m_wrt(row).expr->adjoint;
+  for (const auto& [row, adjoint] : adjoints) {
     if (adjoint != 0.0) {
       m_g.insertBack(row) = adjoint;
     }

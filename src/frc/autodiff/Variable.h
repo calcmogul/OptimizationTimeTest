@@ -30,7 +30,7 @@ class WPILIB_DLLEXPORT Variable {
   Variable(int value);  // NOLINT
 
   /**
-   * Constructs a Variable pointing to the specified entry on a tape.
+   * Constructs a Variable pointing to the specified expression.
    *
    * @param expr The autodiff variable.
    */

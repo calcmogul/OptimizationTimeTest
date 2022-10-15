@@ -8,6 +8,6 @@ cp -r ~/frc/wpilib/allwpilib/wpimath/src/main/native/cpp/optimization/ src/frc/
 cp ~/frc/wpilib/allwpilib/wpiutil/src/main/native/include/wpi/IntrusiveSharedPtr.h src/wpi/
 cp ~/frc/wpilib/allwpilib/wpiutil/src/main/native/include/wpi/scope src/wpi/
 
-find src/frc/autodiff -type f -name \*\.cpp -exec sed -i 's!wpi/DenseMap.h!unordered_map!' {} \;
-find src/frc/autodiff -type f -name \*\.cpp -exec sed -i 's!wpi::DenseMap!std::unordered_map!' {} \;
-wpiformat
+# LLVM classes
+cp ~/frc/wpilib/allwpilib/wpiutil/src/main/native/thirdparty/llvm/include/wpi/{AlignOf,Compiler,DenseMap,DenseMapInfo,EpochTracker,ErrorHandling,MathExtras,MemAlloc,PointerLikeTypeTraits,ReverseIteration,type_traits}.h src/wpi
+cp ~/frc/wpilib/allwpilib/wpiutil/src/main/native/thirdparty/llvm/cpp/llvm/MemAlloc.cpp src/llvm

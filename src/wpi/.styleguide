@@ -14,6 +14,17 @@ cppSrcFileInclude {
 
 generatedFileExclude {
   src/main/native/thirdparty/
+  src/wpi/AlignOf\.h$
+  src/wpi/Compiler\.h$
+  src/wpi/DenseMap\.h$
+  src/wpi/DenseMapInfo\.h$
+  src/wpi/EpochTracker\.h$
+  src/wpi/ErrorHandling\.h$
+  src/wpi/MathExtras\.h$
+  src/wpi/MemAlloc\.h$
+  src/wpi/PointerLikeTypeTraits\.h$
+  src/wpi/ReverseIteration\.h$
+  src/wpi/type_traits\.h$
 
   src/main/native/include/wpi/fs\.h$
   src/main/native/cpp/fs\.cpp$

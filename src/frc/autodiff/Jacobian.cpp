@@ -5,8 +5,8 @@
 #include "frc/autodiff/Jacobian.h"
 
 #include <tuple>
-#include <unordered_map>
 
+#include <wpi/DenseMap.h>
 #include <wpi/IntrusiveSharedPtr.h>
 
 #include "frc/autodiff/Gradient.h"
@@ -67,7 +67,7 @@ void Jacobian::CalculateImpl() {
     m_wrt(row).expr->row = row;
   }
 
-  std::unordered_map<int, double> adjoints;
+  wpi::DenseMap<int, double> adjoints;
 
   // Stack element contains variable and its adjoint
   std::vector<std::tuple<Variable, double>> stack;

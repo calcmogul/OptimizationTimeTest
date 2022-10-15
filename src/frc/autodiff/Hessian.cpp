@@ -5,8 +5,8 @@
 #include "frc/autodiff/Hessian.h"
 
 #include <tuple>
-#include <unordered_map>
 
+#include <wpi/DenseMap.h>
 #include <wpi/IntrusiveSharedPtr.h>
 
 #include "frc/autodiff/Gradient.h"
@@ -67,7 +67,7 @@ void Hessian::CalculateImpl() {
     m_wrt(row).expr->row = row;
   }
 
-  std::unordered_map<int, double> adjoints;
+  wpi::DenseMap<int, double> adjoints;
 
   // Stack element contains variable and its adjoint
   std::vector<std::tuple<Variable, double>> stack;
@@ -133,7 +133,7 @@ VectorXvar Hessian::GenerateGradientTree(Variable& variable,
     wrt(row).expr->row = row;
   }
 
-  std::unordered_map<int, wpi::IntrusiveSharedPtr<Expression>> adjoints;
+  wpi::DenseMap<int, wpi::IntrusiveSharedPtr<Expression>> adjoints;
 
   // Stack element contains variable and its adjoint
   std::vector<std::tuple<Variable, wpi::IntrusiveSharedPtr<Expression>>> stack;

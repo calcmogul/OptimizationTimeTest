@@ -89,7 +89,12 @@ int main() {
     fmt::print(stderr, "Problem (N = {})...", N);
     RunTest<frc::OptimizationProblem>(
         results, [=] { return CartPoleOptimizationProblem(dt, N); },
-        [](frc::OptimizationProblem& problem) { problem.Solve(); });
+        [](frc::OptimizationProblem& problem) {
+          frc::SolverConfig config;
+          config.diagnostics = true;
+          config.maxIterations = 5;
+          problem.Solve(config);
+        });
     fmt::print(stderr, " done.\n");
 
     results << "\n";

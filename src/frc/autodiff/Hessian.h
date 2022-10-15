@@ -51,16 +51,15 @@ class WPILIB_DLLEXPORT Hessian {
   VectorXvar m_variables;
   VectorXvar m_wrt;
 
-  // The highest order expression type in m_variables
-  ExpressionType m_highestOrderType = ExpressionType::kNone;
-
-  std::vector<Eigen::Triplet<double>> m_triplets;
+  std::vector<Eigen::Triplet<double>> m_cachedTriplets;
 
   Eigen::SparseMatrix<double> m_H;
 
+  std::vector<int> m_nonlinearRows;
+
   Profiler m_profiler;
 
-  void CalculateImpl();
+  void ComputeRow(int row, std::vector<Eigen::Triplet<double>>& triplets);
 
   /**
    * Returns the given variable's gradient tree.

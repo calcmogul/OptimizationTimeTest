@@ -5,9 +5,15 @@
 #include "frc/autodiff/Expression.h"
 
 #include <cmath>
-#include <utility>
+#include <type_traits>
 
 #include <wpi/numbers>
+
+// https://en.cppreference.com/w/cpp/utility/to_underlying from C++23
+template <class Enum>
+constexpr std::underlying_type_t<Enum> to_underlying(Enum e) noexcept {
+  return static_cast<std::underlying_type_t<Enum>>(e);
+}
 
 namespace frc::autodiff {
 
@@ -198,7 +204,7 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator+(
 
   return wpi::MakeIntrusiveShared<Expression>(
       ExpressionType{
-          std::max(static_cast<int>(lhs->type), static_cast<int>(rhs->type))},
+          std::max(to_underlying(lhs->type), to_underlying(rhs->type))},
       [](double lhs, double rhs) { return lhs + rhs; },
       [](double lhs, double rhs, double parentAdjoint) {
         return parentAdjoint;
@@ -251,7 +257,7 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator-(
 
   return wpi::MakeIntrusiveShared<Expression>(
       ExpressionType{
-          std::max(static_cast<int>(lhs->type), static_cast<int>(rhs->type))},
+          std::max(to_underlying(lhs->type), to_underlying(rhs->type))},
       [](double lhs, double rhs) { return lhs - rhs; },
       [](double lhs, double rhs, double parentAdjoint) {
         return parentAdjoint;

@@ -9,45 +9,42 @@
 #include <wpi/DenseMap.h>
 #include <wpi/IntrusiveSharedPtr.h>
 
-#include "frc/autodiff/Gradient.h"
-
 using namespace frc::autodiff;
 
 Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt) noexcept
     : m_variables{GenerateGradientTree(variable, wrt)},
       m_wrt{std::move(wrt)},
       m_H{m_variables.rows(), m_variables.rows()} {
-  // Get the highest order expression type
-  for (const auto& variable : m_variables) {
-    if (m_highestOrderType < variable.Type()) {
-      m_highestOrderType = variable.Type();
-    }
+  m_profiler.Start();
+
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    m_wrt(row).expr->row = row;
   }
 
   // Reserve triplet space for 99% sparsity
-  m_triplets.reserve(m_variables.rows() * m_wrt.rows() * 0.01);
+  m_cachedTriplets.reserve(m_variables.rows() * m_wrt.rows() * 0.01);
 
-  if (m_highestOrderType < ExpressionType::kLinear) {
-    // If the expression is less than linear, the Hessian is zero
-    m_profiler.Start();
-    m_H.setZero();
-    m_profiler.Stop();
-  } else if (m_highestOrderType == ExpressionType::kLinear) {
-    // If the expression is linear, compute it once since it's constant
-    CalculateImpl();
-  }
-}
-
-const Eigen::SparseMatrix<double>& Hessian::Calculate() {
-  if (m_highestOrderType > ExpressionType::kLinear) {
-    CalculateImpl();
+  for (int row = 0; row < m_variables.rows(); ++row) {
+    if (m_variables(row).expr->type == ExpressionType::kLinear) {
+      ComputeRow(row, m_cachedTriplets);
+    } else if (m_variables(row).expr->type > ExpressionType::kLinear) {
+      m_nonlinearRows.emplace_back(row);
+    }
   }
 
-  return m_H;
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    m_wrt(row).expr->row = -1;
+  }
+
+  if (m_nonlinearRows.empty()) {
+    m_H.setFromTriplets(m_cachedTriplets.begin(), m_cachedTriplets.end());
+  }
+
+  m_profiler.Stop();
 }
 
 void Hessian::Update() {
-  for (int row = 0; row < m_variables.rows(); ++row) {
+  for (int row : m_nonlinearRows) {
     m_variables(row).Update();
   }
 }
@@ -56,72 +53,75 @@ Profiler& Hessian::GetProfiler() {
   return m_profiler;
 }
 
-void Hessian::CalculateImpl() {
+const Eigen::SparseMatrix<double>& Hessian::Calculate() {
+  if (m_nonlinearRows.empty()) {
+    return m_H;
+  }
+
   m_profiler.Start();
 
   Update();
-
-  m_triplets.clear();
 
   for (int row = 0; row < m_wrt.rows(); ++row) {
     m_wrt(row).expr->row = row;
   }
 
+  auto triplets = m_cachedTriplets;
+  for (int row : m_nonlinearRows) {
+    ComputeRow(row, triplets);
+  }
+
+  for (int row = 0; row < m_wrt.rows(); ++row) {
+    m_wrt(row).expr->row = -1;
+  }
+
+  m_H.setFromTriplets(triplets.begin(), triplets.end());
+
+  m_profiler.Stop();
+
+  return m_H;
+}
+
+void Hessian::ComputeRow(int row,
+                         std::vector<Eigen::Triplet<double>>& triplets) {
   wpi::DenseMap<int, double> adjoints;
 
   // Stack element contains variable and its adjoint
   std::vector<std::tuple<Variable, double>> stack;
   stack.reserve(1024);
 
-  for (int row = 0; row < m_variables.rows(); ++row) {
-    if (row > 0) {
-      m_wrt(row - 1).expr->row = -1;
-    }
+  stack.emplace_back(m_variables(row), 1.0);
+  while (!stack.empty()) {
+    Variable var = std::move(std::get<0>(stack.back()));
+    double adjoint = std::move(std::get<1>(stack.back()));
+    stack.pop_back();
 
-    adjoints.clear();
+    auto& lhs = var.expr->args[0];
+    auto& rhs = var.expr->args[1];
 
-    stack.emplace_back(m_variables(row), 1.0);
-    while (!stack.empty()) {
-      Variable var = std::move(std::get<0>(stack.back()));
-      double adjoint = std::move(std::get<1>(stack.back()));
-      stack.pop_back();
+    // The row is turned into a column to transpose the Jacobian
+    int col = var.expr->row;
 
-      auto& lhs = var.expr->args[0];
-      auto& rhs = var.expr->args[1];
-
-      // The row is turned into a column to transpose the Jacobian
-      int col = var.expr->row;
-
-      if (lhs != nullptr) {
-        if (rhs == nullptr) {
-          stack.emplace_back(
-              lhs, var.expr->gradientValueFuncs[0](lhs->value, 0.0, adjoint));
-        } else {
-          stack.emplace_back(lhs, var.expr->gradientValueFuncs[0](
-                                      lhs->value, rhs->value, adjoint));
-          stack.emplace_back(rhs, var.expr->gradientValueFuncs[1](
-                                      lhs->value, rhs->value, adjoint));
-        }
-      }
-
-      if (col != -1) {
-        adjoints[col] += adjoint;
+    if (lhs != nullptr) {
+      if (rhs == nullptr) {
+        stack.emplace_back(
+            lhs, var.expr->gradientValueFuncs[0](lhs->value, 0.0, adjoint));
+      } else {
+        stack.emplace_back(lhs, var.expr->gradientValueFuncs[0](
+                                    lhs->value, rhs->value, adjoint));
+        stack.emplace_back(rhs, var.expr->gradientValueFuncs[1](
+                                    lhs->value, rhs->value, adjoint));
       }
     }
 
-    for (const auto& [col, adjoint] : adjoints) {
-      m_triplets.emplace_back(row, col, adjoint);
-      if (row != col) {
-        m_triplets.emplace_back(col, row, adjoint);
-      }
+    if (col != -1) {
+      adjoints[col] += adjoint;
     }
   }
 
-  m_wrt(m_variables.size() - 1).expr->row = -1;
-
-  m_H.setFromTriplets(m_triplets.begin(), m_triplets.end());
-
-  m_profiler.Stop();
+  for (const auto& [col, adjoint] : adjoints) {
+    triplets.emplace_back(row, col, adjoint);
+  }
 }
 
 VectorXvar Hessian::GenerateGradientTree(Variable& variable,

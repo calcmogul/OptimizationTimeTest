@@ -5,9 +5,8 @@
 #include "frc/autodiff/Expression.h"
 
 #include <cmath>
+#include <numbers>
 #include <type_traits>
-
-#include <wpi/numbers>
 
 // https://en.cppreference.com/w/cpp/utility/to_underlying from C++23
 template <class Enum>
@@ -16,6 +15,11 @@ constexpr std::underlying_type_t<Enum> to_underlying(Enum e) noexcept {
 }
 
 namespace frc::autodiff {
+
+PoolAllocator<Expression> Allocator() {
+  static PoolResource<Expression> pool;
+  return PoolAllocator<Expression>{&pool};
+}
 
 Expression::Expression(double value, ExpressionType type)
     : value{value}, type{type} {}
@@ -104,8 +108,8 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator*(
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double lhs, double rhs) { return lhs * rhs; },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double lhs, double rhs) { return lhs * rhs; },
       [](double lhs, double rhs, double parentAdjoint) {
         return parentAdjoint * rhs;
       },
@@ -154,8 +158,8 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator/(
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double lhs, double rhs) { return lhs / rhs; },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double lhs, double rhs) { return lhs / rhs; },
       [](double lhs, double rhs, double parentAdjoint) {
         return parentAdjoint / rhs;
       },
@@ -202,7 +206,8 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator+(
     return lhs;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(),
       ExpressionType{
           std::max(to_underlying(lhs->type), to_underlying(rhs->type))},
       [](double lhs, double rhs) { return lhs + rhs; },
@@ -255,7 +260,8 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator-(
     return lhs;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(),
       ExpressionType{
           std::max(to_underlying(lhs->type), to_underlying(rhs->type))},
       [](double lhs, double rhs) { return lhs - rhs; },
@@ -284,8 +290,8 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator-(
     return nullptr;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      lhs->type, [](double lhs, double) { return -lhs; },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), lhs->type, [](double lhs, double) { return -lhs; },
       [](double lhs, double, double parentAdjoint) { return -parentAdjoint; },
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>& rhs,
@@ -301,8 +307,8 @@ WPILIB_DLLEXPORT wpi::IntrusiveSharedPtr<Expression> operator+(
     return nullptr;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      lhs->type, [](double lhs, double) { return lhs; },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), lhs->type, [](double lhs, double) { return lhs; },
       [](double lhs, double, double parentAdjoint) { return parentAdjoint; },
       [](const wpi::IntrusiveSharedPtr<Expression>& lhs,
          const wpi::IntrusiveSharedPtr<Expression>& rhs,
@@ -329,7 +335,8 @@ void Expression::Update() {
 }
 
 wpi::IntrusiveSharedPtr<Expression> MakeConstant(double x) {
-  return wpi::MakeIntrusiveShared<Expression>(x, ExpressionType::kConstant);
+  return wpi::AllocateIntrusiveShared<Expression>(Allocator(), x,
+                                                  ExpressionType::kConstant);
 }
 
 wpi::IntrusiveSharedPtr<Expression> abs(  // NOLINT
@@ -346,8 +353,8 @@ wpi::IntrusiveSharedPtr<Expression> abs(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::abs(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::abs(x); },
       [](double x, double, double parentAdjoint) {
         if (x < 0.0) {
           return -parentAdjoint;
@@ -374,7 +381,7 @@ wpi::IntrusiveSharedPtr<Expression> abs(  // NOLINT
 wpi::IntrusiveSharedPtr<Expression> acos(  // NOLINT
     const wpi::IntrusiveSharedPtr<Expression>& x) {
   if (x == nullptr) {
-    return MakeConstant(wpi::numbers::pi / 2.0);
+    return MakeConstant(std::numbers::pi / 2.0);
   }
 
   // Evaluate the expression's type
@@ -385,8 +392,8 @@ wpi::IntrusiveSharedPtr<Expression> acos(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::acos(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::acos(x); },
       [](double x, double, double parentAdjoint) {
         return -parentAdjoint / std::sqrt(1.0 - x * x);
       },
@@ -412,8 +419,8 @@ wpi::IntrusiveSharedPtr<Expression> asin(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::asin(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::asin(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint / std::sqrt(1.0 - x * x);
       },
@@ -439,8 +446,8 @@ wpi::IntrusiveSharedPtr<Expression> atan(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::atan(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::atan(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint / (1.0 + x * x);
       },
@@ -458,7 +465,7 @@ wpi::IntrusiveSharedPtr<Expression> atan2(  // NOLINT
   if (y == nullptr) {
     return nullptr;
   } else if (x == nullptr) {
-    return MakeConstant(wpi::numbers::pi / 2.0);
+    return MakeConstant(std::numbers::pi / 2.0);
   }
 
   // Evaluate the expression's type
@@ -470,8 +477,8 @@ wpi::IntrusiveSharedPtr<Expression> atan2(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double y, double x) { return std::atan2(y, x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double y, double x) { return std::atan2(y, x); },
       [](double y, double x, double parentAdjoint) {
         return parentAdjoint * x / (y * y + x * x);
       },
@@ -505,8 +512,8 @@ wpi::IntrusiveSharedPtr<Expression> cos(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::cos(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::cos(x); },
       [](double x, double, double parentAdjoint) {
         return -parentAdjoint * std::sin(x);
       },
@@ -532,8 +539,8 @@ wpi::IntrusiveSharedPtr<Expression> cosh(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::cosh(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::cosh(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint * std::sinh(x);
       },
@@ -562,8 +569,8 @@ wpi::IntrusiveSharedPtr<Expression> erf(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::erf(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::erf(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint * 2.0 / sqrt_pi * std::exp(-x * x);
       },
@@ -589,8 +596,8 @@ wpi::IntrusiveSharedPtr<Expression> exp(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::exp(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::exp(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint * std::exp(x);
       },
@@ -618,8 +625,8 @@ wpi::IntrusiveSharedPtr<Expression> hypot(  // NOLINT
       type = ExpressionType::kNonlinear;
     }
 
-    return wpi::MakeIntrusiveShared<Expression>(
-        type, [](double x, double y) { return std::hypot(x, y); },
+    return wpi::AllocateIntrusiveShared<Expression>(
+        Allocator(), type, [](double x, double y) { return std::hypot(x, y); },
         [](double x, double y, double parentAdjoint) {
           return parentAdjoint * x / std::hypot(x, y);
         },
@@ -646,8 +653,8 @@ wpi::IntrusiveSharedPtr<Expression> hypot(  // NOLINT
       type = ExpressionType::kNonlinear;
     }
 
-    return wpi::MakeIntrusiveShared<Expression>(
-        type, [](double x, double y) { return std::hypot(x, y); },
+    return wpi::AllocateIntrusiveShared<Expression>(
+        Allocator(), type, [](double x, double y) { return std::hypot(x, y); },
         [](double x, double y, double parentAdjoint) {
           return parentAdjoint * x / std::hypot(x, y);
         },
@@ -675,8 +682,8 @@ wpi::IntrusiveSharedPtr<Expression> hypot(  // NOLINT
       type = ExpressionType::kNonlinear;
     }
 
-    return wpi::MakeIntrusiveShared<Expression>(
-        type, [](double x, double y) { return std::hypot(x, y); },
+    return wpi::AllocateIntrusiveShared<Expression>(
+        Allocator(), type, [](double x, double y) { return std::hypot(x, y); },
         [](double x, double y, double parentAdjoint) {
           return parentAdjoint * x / std::hypot(x, y);
         },
@@ -711,8 +718,8 @@ wpi::IntrusiveSharedPtr<Expression> log(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::log(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::log(x); },
       [](double x, double, double parentAdjoint) { return parentAdjoint / x; },
       [](const wpi::IntrusiveSharedPtr<Expression>& x,
          const wpi::IntrusiveSharedPtr<Expression>&,
@@ -738,8 +745,8 @@ wpi::IntrusiveSharedPtr<Expression> log10(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::log10(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::log10(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint / (ln10 * x);
       },
@@ -781,8 +788,9 @@ wpi::IntrusiveSharedPtr<Expression> pow(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double base, double power) { return std::pow(base, power); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type,
+      [](double base, double power) { return std::pow(base, power); },
       [](double base, double power, double parentAdjoint) {
         return parentAdjoint * std::pow(base, power - 1) * power;
       },
@@ -828,8 +836,8 @@ wpi::IntrusiveSharedPtr<Expression> sin(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::sin(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::sin(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint * std::cos(x);
       },
@@ -855,8 +863,8 @@ wpi::IntrusiveSharedPtr<Expression> sinh(
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::sinh(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::sinh(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint * std::cosh(x);
       },
@@ -882,8 +890,8 @@ wpi::IntrusiveSharedPtr<Expression> sqrt(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::sqrt(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::sqrt(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint / (2.0 * std::sqrt(x));
       },
@@ -909,8 +917,8 @@ wpi::IntrusiveSharedPtr<Expression> tan(  // NOLINT
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::tan(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::tan(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint / (std::cos(x) * std::cos(x));
       },
@@ -936,8 +944,8 @@ wpi::IntrusiveSharedPtr<Expression> tanh(
     type = ExpressionType::kNonlinear;
   }
 
-  return wpi::MakeIntrusiveShared<Expression>(
-      type, [](double x, double) { return std::tanh(x); },
+  return wpi::AllocateIntrusiveShared<Expression>(
+      Allocator(), type, [](double x, double) { return std::tanh(x); },
       [](double x, double, double parentAdjoint) {
         return parentAdjoint / (std::cosh(x) * std::cosh(x));
       },

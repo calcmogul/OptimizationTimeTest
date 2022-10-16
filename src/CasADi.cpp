@@ -4,6 +4,8 @@
 
 #include "CasADi.h"
 
+#include <numbers>
+
 #include <frc/EigenCore.h>
 #include <frc/system/Discretization.h>
 #include <frc/system/NumericalIntegration.h>
@@ -14,7 +16,6 @@
 #include <units/force.h>
 #include <units/length.h>
 #include <units/voltage.h>
-#include <wpi/numbers>
 
 casadi::Opti FlywheelCasADi(units::second_t dt, int N) {
   // Flywheel model:
@@ -147,7 +148,7 @@ casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
   // Initial guess
   for (int k = 0; k < N; ++k) {
     opti.set_initial(X(0, k), static_cast<double>(k) / N * d.value());
-    opti.set_initial(X(1, k), static_cast<double>(k) / N * wpi::numbers::pi);
+    opti.set_initial(X(1, k), static_cast<double>(k) / N * std::numbers::pi);
   }
 
   // u = f_x
@@ -158,7 +159,7 @@ casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
 
   // Final conditions
   opti.subject_to(X(0, N) == 1.0);
-  opti.subject_to(X(1, N) == wpi::numbers::pi);
+  opti.subject_to(X(1, N) == std::numbers::pi);
   opti.subject_to(X(2, N) == 0.0);
   opti.subject_to(X(3, N) == 0.0);
 

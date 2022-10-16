@@ -26,8 +26,13 @@ Jacobian::Jacobian(VectorXvar variables, VectorXvar wrt) noexcept
 
   for (int row = 0; row < m_variables.rows(); ++row) {
     if (m_variables(row).expr->type == ExpressionType::kLinear) {
+      // If the row is linear, compute its gradient once here and cache its
+      // triplets. Constant rows are ignored because their gradients have no
+      // nonzero triplets.
       ComputeRow(row, m_cachedTriplets);
     } else if (m_variables(row).expr->type > ExpressionType::kLinear) {
+      // If the row is quadratic or nonlinear, add it to the list of nonlinear
+      // rows to be recomputed in Calculate().
       m_nonlinearRows.emplace_back(row);
     }
   }
@@ -66,7 +71,10 @@ const Eigen::SparseMatrix<double>& Jacobian::Calculate() {
     m_wrt(row).expr->row = row;
   }
 
+  // Copy the cached triplets so triplets added for the nonlinear rows are
+  // thrown away at the end of the function
   auto triplets = m_cachedTriplets;
+
   for (int row : m_nonlinearRows) {
     ComputeRow(row, triplets);
   }

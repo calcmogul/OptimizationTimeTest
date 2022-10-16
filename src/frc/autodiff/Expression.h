@@ -7,9 +7,12 @@
 #include <stdint.h>
 
 #include <array>
+#include <memory>
 
 #include <wpi/IntrusiveSharedPtr.h>
 #include <wpi/SymbolExports.h>
+
+#include "frc/autodiff/Pool.h"
 
 namespace frc::autodiff {
 
@@ -175,6 +178,8 @@ struct WPILIB_DLLEXPORT Expression {
   void Update();
 };
 
+WPILIB_DLLEXPORT PoolAllocator<Expression> Allocator();
+
 /**
  * Refcount increment for intrusive shared pointer.
  *
@@ -191,7 +196,10 @@ inline void IntrusiveSharedPtrIncRefCount(Expression* expr) {
  */
 inline void IntrusiveSharedPtrDecRefCount(Expression* expr) {
   if (--expr->refCount == 0) {
-    delete expr;
+    auto alloc = Allocator();
+    std::allocator_traits<decltype(alloc)>::destroy(alloc, expr);
+    std::allocator_traits<decltype(alloc)>::deallocate(alloc, expr,
+                                                       sizeof(Expression));
   }
 }
 

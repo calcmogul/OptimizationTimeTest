@@ -51,14 +51,24 @@ class WPILIB_DLLEXPORT Hessian {
   VectorXvar m_variables;
   VectorXvar m_wrt;
 
+  Eigen::SparseMatrix<double> m_H{m_variables.rows(), m_variables.rows()};
+
+  // Cached triplets for gradients of linear rows
   std::vector<Eigen::Triplet<double>> m_cachedTriplets;
 
-  Eigen::SparseMatrix<double> m_H;
-
+  // List of row indices for nonlinear rows whose graients will be computed in
+  // Calculate()
   std::vector<int> m_nonlinearRows;
 
   Profiler m_profiler;
 
+  /**
+   * Computes the gradient for the given row and stores its triplets in
+   * "triplets".
+   *
+   * @param row The row of which to compute the gradient.
+   * @param triplets The destination storage for the gradient's triplets.
+   */
   void ComputeRow(int row, std::vector<Eigen::Triplet<double>>& triplets);
 
   /**

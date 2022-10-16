@@ -5,6 +5,7 @@
 #include "OptimizationProblem.h"
 
 #include <cmath>
+#include <numbers>
 
 #include <frc/EigenCore.h>
 #include <frc/optimization/OptimizationProblem.h>
@@ -19,7 +20,6 @@
 #include <units/length.h>
 #include <units/mass.h>
 #include <units/voltage.h>
-#include <wpi/numbers>
 
 frc::OptimizationProblem FlywheelOptimizationProblem(units::second_t dt,
                                                      int N) {
@@ -145,7 +145,7 @@ frc::OptimizationProblem CartPoleOptimizationProblem(units::second_t dt,
   // Initial guess
   for (int k = 0; k < N; ++k) {
     X(0, k) = static_cast<double>(k) / N * d.value();
-    X(1, k) = static_cast<double>(k) / N * wpi::numbers::pi;
+    X(1, k) = static_cast<double>(k) / N * std::numbers::pi;
   }
 
   // u = f_x
@@ -156,7 +156,7 @@ frc::OptimizationProblem CartPoleOptimizationProblem(units::second_t dt,
 
   // Final conditions
   problem.SubjectTo(X.Col(N) ==
-                    frc::Matrixd<4, 1>{d.value(), wpi::numbers::pi, 0.0, 0.0});
+                    frc::Matrixd<4, 1>{d.value(), std::numbers::pi, 0.0, 0.0});
 
   // Cart position constraints
   problem.SubjectTo(X.Row(0) >= 0.0);

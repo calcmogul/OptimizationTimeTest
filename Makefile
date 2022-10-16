@@ -1,7 +1,7 @@
 EXEC := OptimizationTimeTest
 
 CPP := g++
-CPPFLAGS := -O2 -Wall -std=c++17 -flto -Isrc -I/usr/include/eigen3
+CPPFLAGS := -O2 -Wall -std=c++20 -flto -Isrc -I/usr/include/eigen3
 
 LD := g++
 LDFLAGS := -lfmt -lcasadi

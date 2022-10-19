@@ -13,6 +13,8 @@
 #include "CasADi.h"
 #include "OptimizationProblem.h"
 
+static inline constexpr bool diagnostics = false;
+
 /**
  * Converts std::chrono::duration to a number of milliseconds rounded to three
  * decimals.
@@ -79,7 +81,7 @@ int main() {
 
     fmt::print(stderr, "CasADi (N = {})...", N);
     RunTest<casadi::Opti>(
-        results, [=] { return CartPoleCasADi(dt, N); },
+        results, [=] { return CartPoleCasADi(dt, N, diagnostics); },
         [](casadi::Opti& opti) { opti.solve(); });
     fmt::print(stderr, " done.\n");
 
@@ -91,8 +93,7 @@ int main() {
         results, [=] { return CartPoleOptimizationProblem(dt, N); },
         [](frc::OptimizationProblem& problem) {
           frc::SolverConfig config;
-          config.diagnostics = true;
-          config.maxIterations = 5;
+          config.diagnostics = diagnostics;
           problem.Solve(config);
         });
     fmt::print(stderr, " done.\n");

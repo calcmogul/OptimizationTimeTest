@@ -17,7 +17,7 @@
 #include <units/length.h>
 #include <units/voltage.h>
 
-casadi::Opti FlywheelCasADi(units::second_t dt, int N) {
+casadi::Opti FlywheelCasADi(units::second_t dt, int N, bool diagnostics) {
   // Flywheel model:
   // States: [velocity]
   // Inputs: [voltage]
@@ -52,8 +52,12 @@ casadi::Opti FlywheelCasADi(units::second_t dt, int N) {
   }
   opti.minimize(J);
 
-  opti.solver("ipopt", {{"print_time", 0}},
-              {{"print_level", 0}, {"sb", "yes"}});
+  if (diagnostics) {
+    opti.solver("ipopt");
+  } else {
+    opti.solver("ipopt", {{"print_time", 0}},
+                {{"print_level", 0}, {"sb", "yes"}});
+  }
 
   return opti;
 }
@@ -134,7 +138,7 @@ casadi::MX CartPoleDynamics(const casadi::MX& x, const casadi::MX& u) {
   return qddot;
 }
 
-casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
+casadi::Opti CartPoleCasADi(units::second_t dt, int N, bool diagnostics) {
   casadi::Opti opti;
   casadi::Slice all;
 
@@ -186,8 +190,12 @@ casadi::Opti CartPoleCasADi(units::second_t dt, int N) {
   }
   opti.minimize(J);
 
-  opti.solver("ipopt", {{"print_time", 0}},
-              {{"print_level", 0}, {"sb", "yes"}});
+  if (diagnostics) {
+    opti.solver("ipopt");
+  } else {
+    opti.solver("ipopt", {{"print_time", 0}},
+                {{"print_level", 0}, {"sb", "yes"}});
+  }
 
   return opti;
 }

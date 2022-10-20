@@ -24,9 +24,15 @@ namespace frc::autodiff {
  * @tparam T The type of object in the pool.
  */
 template <typename T>
-class WPILIB_DLLEXPORT PoolResource {
+class PoolResource {
  public:
   PoolResource() { AddChunk(); }
+
+  PoolResource(const PoolResource&) = delete;
+  PoolResource& operator=(const PoolResource&) = delete;
+
+  PoolResource(PoolResource&&) = default;
+  PoolResource& operator=(PoolResource&&) = default;
 
   /**
    * Returns a block of memory from the pool.
@@ -89,7 +95,7 @@ class WPILIB_DLLEXPORT PoolResource {
  * @tparam T The type of object in the pool.
  */
 template <typename T>
-class WPILIB_DLLEXPORT PoolAllocator {
+class PoolAllocator {
  public:
   using value_type = T;
 

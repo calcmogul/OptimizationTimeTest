@@ -51,6 +51,8 @@ class WPILIB_DLLEXPORT Jacobian {
   VectorXvar m_variables;
   VectorXvar m_wrt;
 
+  std::vector<std::vector<Expression*>> m_graph;
+
   Eigen::SparseMatrix<double> m_J{m_variables.rows(), m_wrt.rows()};
 
   // Cached triplets for gradients of linear rows

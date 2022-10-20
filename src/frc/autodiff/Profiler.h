@@ -15,40 +15,65 @@ namespace frc::autodiff {
 class Profiler {
  public:
   /**
-   * Tell the profiler to start measuring.
+   * Tell the profiler to start measuring setup time.
    */
-  void Start() { m_startTime = std::chrono::system_clock::now(); }
+  void StartSetup() { m_setupStartTime = std::chrono::system_clock::now(); }
 
   /**
-   * Tell the profiler to stop measuring, increment the number of averages, and
-   * incorporate the latest measurement into the average.
+   * Tell the profiler to stop measuring setup time.
    */
-  void Stop() {
-    auto now = std::chrono::system_clock::now();
-    ++m_measurements;
-    m_averageDuration =
-        (m_measurements - 1.0) / m_measurements * m_averageDuration +
-        1.0 / m_measurements * (now - m_startTime);
+  void StopSetup() {
+    m_setupDuration = std::chrono::system_clock::now() - m_setupStartTime;
   }
 
   /**
-   * The number of measurements taken.
+   * Tell the profiler to start measuring solve time.
    */
-  int Measurements() const { return m_measurements; }
+  void StartSolve() { m_solveStartTime = std::chrono::system_clock::now(); }
 
   /**
-   * The average duration in milliseconds as a double.
+   * Tell the profiler to stop measuring solve time, increment the number of
+   * averages, and incorporate the latest measurement into the average.
    */
-  double AverageDuration() const {
+  void StopSolve() {
+    auto now = std::chrono::system_clock::now();
+    ++m_solveMeasurements;
+    m_averageSolveDuration =
+        (m_solveMeasurements - 1.0) / m_solveMeasurements *
+            m_averageSolveDuration +
+        1.0 / m_solveMeasurements * (now - m_solveStartTime);
+  }
+
+  /**
+   * The setup duration in milliseconds as a double.
+   */
+  double SetupDuration() const {
     using std::chrono::duration_cast;
     using std::chrono::microseconds;
-    return duration_cast<microseconds>(m_averageDuration).count() / 1000.0;
+    return duration_cast<microseconds>(m_setupDuration).count() / 1000.0;
+  }
+
+  /**
+   * The number of solve measurements taken.
+   */
+  int SolveMeasurements() const { return m_solveMeasurements; }
+
+  /**
+   * The average solve duration in milliseconds as a double.
+   */
+  double AverageSolveDuration() const {
+    using std::chrono::duration_cast;
+    using std::chrono::microseconds;
+    return duration_cast<microseconds>(m_averageSolveDuration).count() / 1000.0;
   }
 
  private:
-  int m_measurements = 0;
-  std::chrono::duration<double> m_averageDuration{0.0};
-  std::chrono::system_clock::time_point m_startTime;
+  std::chrono::system_clock::time_point m_setupStartTime;
+  std::chrono::duration<double> m_setupDuration{0.0};
+
+  int m_solveMeasurements = 0;
+  std::chrono::duration<double> m_averageSolveDuration{0.0};
+  std::chrono::system_clock::time_point m_solveStartTime;
 };
 
 }  // namespace frc::autodiff

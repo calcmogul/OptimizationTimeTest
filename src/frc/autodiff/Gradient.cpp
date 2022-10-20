@@ -18,9 +18,9 @@ Gradient::Gradient(Variable variable, Eigen::Ref<VectorXvar> wrt) noexcept
     : m_variable{std::move(variable)}, m_wrt{wrt}, m_g{m_wrt.rows()} {
   if (m_variable.Type() < ExpressionType::kLinear) {
     // If the expression is less than linear, the Jacobian is zero
-    m_profiler.Start();
+    m_profiler.StartSolve();
     m_g.setZero();
-    m_profiler.Stop();
+    m_profiler.StopSolve();
   } else if (m_variable.Type() == ExpressionType::kLinear) {
     // If the expression is linear, compute it once since it's constant
     CalculateImpl();
@@ -47,7 +47,7 @@ void Gradient::CalculateImpl() {
   // Read wpimath/README.md#Reverse_accumulation_automatic_differentiation for
   // background on reverse accumulation automatic differentiation.
 
-  m_profiler.Start();
+  m_profiler.StartSolve();
 
   for (int row = 0; row < m_wrt.rows(); ++row) {
     m_wrt(row).expr->row = row;
@@ -98,5 +98,5 @@ void Gradient::CalculateImpl() {
     }
   }
 
-  m_profiler.Stop();
+  m_profiler.StopSolve();
 }

@@ -27,8 +27,23 @@ struct WPILIB_DLLEXPORT Expression {
       const wpi::IntrusiveSharedPtr<Expression>&);
 
   double value = 0.0;
+  double adjoint = 0.0;
 
+  // Tracks the number of instances of this expression yet to be encountered in
+  // an expression tree.
+  int duplications = 0;
+
+  // This expression's row in wrt for autodiff gradient, Jacobian, or Hessian.
+  // This is -1 if the expression isn't in wrt.
   int row = -1;
+
+  // The expression's creation order. The value assigned here is from a
+  // monotonically increasing counter that increments every time an Expression
+  // is constructed. This is used for sorting a flattened representation of the
+  // expression tree in autodiff Jacobian or Hessian.
+  size_t id;
+
+  wpi::IntrusiveSharedPtr<Expression> adjointExpr;
 
   // Expression argument type
   ExpressionType type = frc::autodiff::ExpressionType::kLinear;

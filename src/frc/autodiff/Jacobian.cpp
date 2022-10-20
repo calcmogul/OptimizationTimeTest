@@ -4,18 +4,69 @@
 
 #include "frc/autodiff/Jacobian.h"
 
-#include <tuple>
-
-#include <wpi/DenseMap.h>
-#include <wpi/IntrusiveSharedPtr.h>
-
 #include "frc/autodiff/Gradient.h"
 
 using namespace frc::autodiff;
 
 Jacobian::Jacobian(VectorXvar variables, VectorXvar wrt) noexcept
     : m_variables{std::move(variables)}, m_wrt{std::move(wrt)} {
-  m_profiler.Start();
+  m_profiler.StartSetup();
+
+  std::vector<Expression*> row;
+  std::vector<Expression*> stack;
+  for (Variable variable : m_variables) {
+    // BFS
+    row.clear();
+
+    stack.emplace_back(variable.expr.Get());
+
+    // Initialize the number of instances of each node in the tree
+    // (Expression::duplications)
+    while (!stack.empty()) {
+      auto& currentNode = stack.back();
+      stack.pop_back();
+
+      for (auto&& arg : currentNode->args) {
+        // Only continue if the node is not a constant and hasn't already been
+        // explored.
+        if (arg != nullptr && arg->type != ExpressionType::kConstant) {
+          // If this is the first instance of the node encountered (it hasn't
+          // been explored yet), add it to stack so it's recursed upon
+          if (arg->duplications == 0) {
+            stack.push_back(arg.Get());
+          }
+          ++arg->duplications;
+        }
+      }
+    }
+
+    stack.clear();
+    stack.emplace_back(variable.expr.Get());
+
+    while (!stack.empty()) {
+      auto& currentNode = stack.back();
+      stack.pop_back();
+
+      // BFS tape sorted from parent to child.
+      row.emplace_back(currentNode);
+
+      for (auto&& arg : currentNode->args) {
+        // Only add node if it's not a constant and doesn't already exist in the
+        // tape.
+        if (arg != nullptr && arg->type != ExpressionType::kConstant) {
+          // Once the number of node visitations equals the number of
+          // duplications (the counter hits zero), add it to the stack. Note
+          // that this means the node is only enqueued once.
+          --arg->duplications;
+          if (arg->duplications == 0) {
+            stack.push_back(arg.Get());
+          }
+        }
+      }
+    }
+
+    m_graph.emplace_back(std::move(row));
+  }
 
   for (int row = 0; row < m_wrt.rows(); ++row) {
     m_wrt(row).expr->row = row;
@@ -45,17 +96,7 @@ Jacobian::Jacobian(VectorXvar variables, VectorXvar wrt) noexcept
     m_J.setFromTriplets(m_cachedTriplets.begin(), m_cachedTriplets.end());
   }
 
-  m_profiler.Stop();
-}
-
-void Jacobian::Update() {
-  for (int row : m_nonlinearRows) {
-    m_variables(row).Update();
-  }
-}
-
-Profiler& Jacobian::GetProfiler() {
-  return m_profiler;
+  m_profiler.StopSetup();
 }
 
 const Eigen::SparseMatrix<double>& Jacobian::Calculate() {
@@ -63,7 +104,7 @@ const Eigen::SparseMatrix<double>& Jacobian::Calculate() {
     return m_J;
   }
 
-  m_profiler.Start();
+  m_profiler.StartSolve();
 
   Update();
 
@@ -85,49 +126,61 @@ const Eigen::SparseMatrix<double>& Jacobian::Calculate() {
 
   m_J.setFromTriplets(triplets.begin(), triplets.end());
 
-  m_profiler.Stop();
+  m_profiler.StopSolve();
 
   return m_J;
 }
 
-void Jacobian::ComputeRow(int row,
+void Jacobian::Update() {
+  for (size_t row = 0; row < m_graph.size(); ++row) {
+    for (int col = m_graph[row].size() - 1; col >= 0; --col) {
+      auto& node = m_graph[row][col];
+
+      auto& lhs = node->args[0];
+      auto& rhs = node->args[1];
+
+      if (lhs != nullptr) {
+        if (rhs != nullptr) {
+          node->value = node->valueFunc(lhs->value, rhs->value);
+        } else {
+          node->value = node->valueFunc(lhs->value, 0.0);
+        }
+      }
+    }
+  }
+}
+
+Profiler& Jacobian::GetProfiler() {
+  return m_profiler;
+}
+
+void Jacobian::ComputeRow(int rowIndex,
                           std::vector<Eigen::Triplet<double>>& triplets) {
-  wpi::DenseMap<int, double> adjoints;
+  auto& row = m_graph[rowIndex];
 
-  // Stack element contains variable and its adjoint
-  std::vector<std::tuple<Variable, double>> stack;
-  stack.reserve(1024);
+  for (auto col : row) {
+    col->adjoint = 0.0;
+  }
+  row[0]->adjoint = 1.0;
 
-  stack.emplace_back(m_variables(row), 1.0);
-  while (!stack.empty()) {
-    Variable var = std::move(std::get<0>(stack.back()));
-    double adjoint = std::move(std::get<1>(stack.back()));
-    stack.pop_back();
-
-    auto& lhs = var.expr->args[0];
-    auto& rhs = var.expr->args[1];
-
-    // The row is turned into a column to transpose the Jacobian
-    int col = var.expr->row;
+  for (auto col : row) {
+    auto& lhs = col->args[0];
+    auto& rhs = col->args[1];
 
     if (lhs != nullptr) {
-      if (rhs == nullptr) {
-        stack.emplace_back(
-            lhs, var.expr->gradientValueFuncs[0](lhs->value, 0.0, adjoint));
+      if (rhs != nullptr) {
+        lhs->adjoint +=
+            col->gradientValueFuncs[0](lhs->value, rhs->value, col->adjoint);
+        rhs->adjoint +=
+            col->gradientValueFuncs[1](lhs->value, rhs->value, col->adjoint);
       } else {
-        stack.emplace_back(lhs, var.expr->gradientValueFuncs[0](
-                                    lhs->value, rhs->value, adjoint));
-        stack.emplace_back(rhs, var.expr->gradientValueFuncs[1](
-                                    lhs->value, rhs->value, adjoint));
+        lhs->adjoint +=
+            col->gradientValueFuncs[0](lhs->value, 0.0, col->adjoint);
       }
     }
 
-    if (col != -1) {
-      adjoints[col] += adjoint;
+    if (col->row != -1) {
+      triplets.emplace_back(rowIndex, col->row, col->adjoint);
     }
-  }
-
-  for (const auto& [col, adjoint] : adjoints) {
-    triplets.emplace_back(row, col, adjoint);
   }
 }

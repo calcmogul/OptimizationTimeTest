@@ -4,130 +4,21 @@
 
 #include "frc/autodiff/Hessian.h"
 
-#include <tuple>
-
-#include <wpi/DenseMap.h>
-#include <wpi/IntrusiveSharedPtr.h>
-
 using namespace frc::autodiff;
 
 Hessian::Hessian(Variable variable, Eigen::Ref<VectorXvar> wrt) noexcept
-    : m_variables{GenerateGradientTree(variable, wrt)}, m_wrt{std::move(wrt)} {
-  m_profiler.Start();
+    : m_jacobian{GenerateGradientTree(variable, wrt), wrt} {}
 
-  for (int row = 0; row < m_wrt.rows(); ++row) {
-    m_wrt(row).expr->row = row;
-  }
-
-  // Reserve triplet space for 99% sparsity
-  m_cachedTriplets.reserve(m_variables.rows() * m_wrt.rows() * 0.01);
-
-  for (int row = 0; row < m_variables.rows(); ++row) {
-    if (m_variables(row).expr->type == ExpressionType::kLinear) {
-      // If the row is linear, compute its gradient once here and cache its
-      // triplets. Constant rows are ignored because their gradients have no
-      // nonzero triplets.
-      ComputeRow(row, m_cachedTriplets);
-    } else if (m_variables(row).expr->type > ExpressionType::kLinear) {
-      // If the row is quadratic or nonlinear, add it to the list of nonlinear
-      // rows to be recomputed in Calculate().
-      m_nonlinearRows.emplace_back(row);
-    }
-  }
-
-  for (int row = 0; row < m_wrt.rows(); ++row) {
-    m_wrt(row).expr->row = -1;
-  }
-
-  if (m_nonlinearRows.empty()) {
-    m_H.setFromTriplets(m_cachedTriplets.begin(), m_cachedTriplets.end());
-  }
-
-  m_profiler.Stop();
+const Eigen::SparseMatrix<double>& Hessian::Calculate() {
+  return m_jacobian.Calculate();
 }
 
 void Hessian::Update() {
-  for (int row : m_nonlinearRows) {
-    m_variables(row).Update();
-  }
+  m_jacobian.Update();
 }
 
 Profiler& Hessian::GetProfiler() {
-  return m_profiler;
-}
-
-const Eigen::SparseMatrix<double>& Hessian::Calculate() {
-  if (m_nonlinearRows.empty()) {
-    return m_H;
-  }
-
-  m_profiler.Start();
-
-  Update();
-
-  for (int row = 0; row < m_wrt.rows(); ++row) {
-    m_wrt(row).expr->row = row;
-  }
-
-  // Copy the cached triplets so triplets added for the nonlinear rows are
-  // thrown away at the end of the function
-  auto triplets = m_cachedTriplets;
-
-  for (int row : m_nonlinearRows) {
-    ComputeRow(row, triplets);
-  }
-
-  for (int row = 0; row < m_wrt.rows(); ++row) {
-    m_wrt(row).expr->row = -1;
-  }
-
-  m_H.setFromTriplets(triplets.begin(), triplets.end());
-
-  m_profiler.Stop();
-
-  return m_H;
-}
-
-void Hessian::ComputeRow(int row,
-                         std::vector<Eigen::Triplet<double>>& triplets) {
-  wpi::DenseMap<int, double> adjoints;
-
-  // Stack element contains variable and its adjoint
-  std::vector<std::tuple<Variable, double>> stack;
-  stack.reserve(1024);
-
-  stack.emplace_back(m_variables(row), 1.0);
-  while (!stack.empty()) {
-    Variable var = std::move(std::get<0>(stack.back()));
-    double adjoint = std::move(std::get<1>(stack.back()));
-    stack.pop_back();
-
-    auto& lhs = var.expr->args[0];
-    auto& rhs = var.expr->args[1];
-
-    // The row is turned into a column to transpose the Jacobian
-    int col = var.expr->row;
-
-    if (lhs != nullptr) {
-      if (rhs == nullptr) {
-        stack.emplace_back(
-            lhs, var.expr->gradientValueFuncs[0](lhs->value, 0.0, adjoint));
-      } else {
-        stack.emplace_back(lhs, var.expr->gradientValueFuncs[0](
-                                    lhs->value, rhs->value, adjoint));
-        stack.emplace_back(rhs, var.expr->gradientValueFuncs[1](
-                                    lhs->value, rhs->value, adjoint));
-      }
-    }
-
-    if (col != -1) {
-      adjoints[col] += adjoint;
-    }
-  }
-
-  for (const auto& [col, adjoint] : adjoints) {
-    triplets.emplace_back(row, col, adjoint);
-  }
+  return m_jacobian.GetProfiler();
 }
 
 VectorXvar Hessian::GenerateGradientTree(Variable& variable,
@@ -139,56 +30,87 @@ VectorXvar Hessian::GenerateGradientTree(Variable& variable,
     wrt(row).expr->row = row;
   }
 
-  wpi::DenseMap<int, wpi::IntrusiveSharedPtr<Expression>> adjoints;
+  // BFS
+  std::vector<Expression*> row;
+  row.reserve(variable.expr->id);
+  std::vector<Expression*> stack;
 
-  // Stack element contains variable and its adjoint
-  std::vector<std::tuple<Variable, wpi::IntrusiveSharedPtr<Expression>>> stack;
-  stack.reserve(1024);
+  stack.emplace_back(variable.expr.Get());
 
-  stack.emplace_back(variable, MakeConstant(1.0));
+  // Initialize the number of instances of each node in the tree
+  // (Expression::duplications)
   while (!stack.empty()) {
-    Variable var = std::move(std::get<0>(stack.back()));
-    wpi::IntrusiveSharedPtr<Expression> adjoint =
-        std::move(std::get<1>(stack.back()));
+    auto& currentNode = stack.back();
     stack.pop_back();
 
-    auto& lhs = var.expr->args[0];
-    auto& rhs = var.expr->args[1];
+    for (auto&& arg : currentNode->args) {
+      // Only continue if the node is not a constant and hasn't already been
+      // explored.
+      if (arg != nullptr && arg->type != ExpressionType::kConstant) {
+        // If this is the first instance of the node encountered (it hasn't been
+        // explored yet), add it to stack so it's recursed upon
+        if (arg->duplications == 0) {
+          stack.push_back(arg.Get());
+        }
+        ++arg->duplications;
+      }
+    }
+  }
 
-    int row = var.expr->row;
+  stack.clear();
+  stack.emplace_back(variable.expr.Get());
+
+  while (!stack.empty()) {
+    auto& currentNode = stack.back();
+    stack.pop_back();
+
+    // BFS tape sorted from parent to child.
+    row.emplace_back(currentNode);
+
+    for (auto&& arg : currentNode->args) {
+      // Only add node if it's not a constant and doesn't already exist in the
+      // tape.
+      if (arg != nullptr && arg->type != ExpressionType::kConstant) {
+        // Once the number of node visitations equals the number of duplications
+        // (the counter hits zero), add it to the stack. Note that this means
+        // the node is only enqueued once.
+        --arg->duplications;
+        if (arg->duplications == 0) {
+          stack.push_back(arg.Get());
+        }
+      }
+    }
+  }
+
+  VectorXvar grad{wrt.rows()};
+  grad.fill(Variable{});
+
+  // Zero adjoints
+  for (auto col : row) {
+    col->adjointExpr = nullptr;
+  }
+  row[0]->adjointExpr = MakeConstant(1.0);
+
+  for (auto col : row) {
+    auto& lhs = col->args[0];
+    auto& rhs = col->args[1];
 
     if (lhs != nullptr) {
-      stack.emplace_back(lhs, var.expr->gradientFuncs[0](lhs, rhs, adjoint));
-
+      lhs->adjointExpr =
+          lhs->adjointExpr + col->gradientFuncs[0](lhs, rhs, col->adjointExpr);
       if (rhs != nullptr) {
-        stack.emplace_back(rhs, var.expr->gradientFuncs[1](lhs, rhs, adjoint));
+        rhs->adjointExpr = rhs->adjointExpr +
+                           col->gradientFuncs[1](lhs, rhs, col->adjointExpr);
       }
     }
 
-    if (row != -1) {
-      if (adjoints[row] == nullptr) {
-        adjoints[row] = adjoint;
-      } else {
-        adjoints[row] = adjoints[row] + adjoint;
-      }
+    if (col->row != -1) {
+      grad(col->row) = Variable{col->adjointExpr};
     }
   }
 
   for (int row = 0; row < wrt.rows(); ++row) {
     wrt(row).expr->row = -1;
-  }
-
-  VectorXvar grad{wrt.rows()};
-  for (const auto& [row, adjoint] : adjoints) {
-    auto expr = wrt(row).expr;
-    if (expr != nullptr) {
-      grad(row) = Variable{adjoint};
-    }
-  }
-
-  // Free adjoint storage that's no longer needed
-  for (auto& pair : adjoints) {
-    pair.second = nullptr;
   }
 
   return grad;

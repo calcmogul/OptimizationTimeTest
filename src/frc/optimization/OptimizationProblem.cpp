@@ -561,20 +561,24 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
       }
       fmt::print("\n");
 
-      fmt::print("autodiff  avg duration (ms)  evals\n");
-      fmt::print("==================================\n");
-      fmt::print("  ∇f(x)      {:>10}     {:>5}\n",
-                 gradientF.GetProfiler().AverageDuration(),
-                 gradientF.GetProfiler().Measurements());
-      fmt::print("  ∇²ₓₓL      {:>10}     {:>5}\n",
-                 hessianL.GetProfiler().AverageDuration(),
-                 hessianL.GetProfiler().Measurements());
-      fmt::print(" ∂cₑ/∂x      {:>10}     {:>5}\n",
-                 jacobianCe.GetProfiler().AverageDuration(),
-                 jacobianCe.GetProfiler().Measurements());
-      fmt::print(" ∂cᵢ/∂x      {:>10}     {:>5}\n",
-                 jacobianCi.GetProfiler().AverageDuration(),
-                 jacobianCi.GetProfiler().Measurements());
+      fmt::print("autodiff  setup (ms)  avg solve (ms)  solves\n");
+      fmt::print("============================================\n");
+      fmt::print("   ∇f(x)  {:>10}  {:>14}  {:>6}\n",
+                 gradientF.GetProfiler().SetupDuration(),
+                 gradientF.GetProfiler().AverageSolveDuration(),
+                 gradientF.GetProfiler().SolveMeasurements());
+      fmt::print("   ∇²ₓₓL  {:>10}  {:>14}  {:>6}\n",
+                 hessianL.GetProfiler().SetupDuration(),
+                 hessianL.GetProfiler().AverageSolveDuration(),
+                 hessianL.GetProfiler().SolveMeasurements());
+      fmt::print("  ∂cₑ/∂x  {:>10}  {:>14}  {:>6}\n",
+                 jacobianCe.GetProfiler().SetupDuration(),
+                 jacobianCe.GetProfiler().AverageSolveDuration(),
+                 jacobianCe.GetProfiler().SolveMeasurements());
+      fmt::print("  ∂cᵢ/∂x  {:>10}  {:>14}  {:>6}\n",
+                 jacobianCi.GetProfiler().SetupDuration(),
+                 jacobianCi.GetProfiler().AverageSolveDuration(),
+                 jacobianCi.GetProfiler().SolveMeasurements());
       fmt::print("\n");
     }
   }};

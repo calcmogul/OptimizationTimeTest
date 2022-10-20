@@ -14,7 +14,8 @@
  * @param N Number of samples in the problem.
  * @param diagnostics True if diagnostic prints should be enabled.
  */
-casadi::Opti FlywheelCasADi(units::second_t dt, int N, bool diagnostics = false);
+casadi::Opti FlywheelCasADi(units::second_t dt, int N,
+                            bool diagnostics = false);
 
 /**
  * Creates a cart-pole nonlinear optimization problem with CasADi.
@@ -23,4 +24,5 @@ casadi::Opti FlywheelCasADi(units::second_t dt, int N, bool diagnostics = false)
  * @param N Number of samples in the problem.
  * @param diagnostics True if diagnostic prints should be enabled.
  */
-casadi::Opti CartPoleCasADi(units::second_t dt, int N, bool diagnostics = false);
+casadi::Opti CartPoleCasADi(units::second_t dt, int N,
+                            bool diagnostics = false);

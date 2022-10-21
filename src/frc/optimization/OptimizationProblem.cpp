@@ -682,9 +682,18 @@ Eigen::VectorXd OptimizationProblem::InteriorPoint(
       rhs.bottomRows(y.rows()) = c_e;
 
       // Regularize lhs by adding a multiple of the identity matrix
+      //
+      // lhs = [H + AᵢᵀΣAᵢ + δI   Aₑᵀ]
+      //       [       Aₑ        −δI ]
       Eigen::SparseMatrix<double> regularization{lhs.rows(), lhs.cols()};
-      regularization.setIdentity();
-      regularization *= 1e-9;
+      triplets.clear();
+      for (int row = 0; row < H.rows(); ++row) {
+        triplets.emplace_back(row, row, 1e-9);
+      }
+      for (int row = H.rows(); row < lhs.rows(); ++row) {
+        triplets.emplace_back(row, row, -1e-9);
+      }
+      regularization.setFromTriplets(triplets.begin(), triplets.end());
       lhs += regularization;
 
       // Solve the Newton-KKT system
